@@ -1,0 +1,22 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# https://www.playframework.com/documentation/latest/ScalaRouting
+# ~~~~
+
+# An example controller showing a sample home page
+OPTIONS        /*path                            controllers.CorsController.index(path)
+POST           /auth                             controllers.UserController.auth
+GET            /master/all                       controllers.MasterController.all
+GET            /assets                           controllers.AssetController.listByUserId()
+GET            /accounts                         controllers.AccountController.listByUserId()
+POST           /incomeSpending/register          controllers.IncomeSpendingController.register
+PUT            /incomeSpending/update            controllers.IncomeSpendingController.update
+POST           /incomeSpending/delete/:id        controllers.IncomeSpendingController.delete(id: Long)
+# ex) /incomeSpending/list?limit=30
+GET            /incomeSpending/list              controllers.IncomeSpendingController.list(limit: Option[Int])
+GET            /incomeSpending/monthly           controllers.IncomeSpendingController.listOfMonth(yyyyMM: Int, limit: Option[Int])
+GET            /budget/list                      controllers.BudgetController.list(yyyyMM: Int)
+POST           /budget/registerOrUpdate          controllers.BudgetController.registerOrUpdate()
+
+# Map static resources from the /public folder to the /assets URL path
+GET            /assets/*file                     controllers.Assets.versioned(path="/public", file: Asset)
