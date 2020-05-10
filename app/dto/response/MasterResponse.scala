@@ -1,74 +1,58 @@
 package dto.response
 
 import caches.HowToPay
-import entities.{Category, ParentCategory}
+import entities.{Category, CategoryDetail}
 import play.api.libs.json.{Format, Json}
 
 case class MasterResponse(
-  parentCategories: List[ParentCategoryResponse],
   categories: List[CategoryResponse],
+  categoryDetails: List[CategoryDetailResponse],
   howToPays: List[HowToPayResponse]
 )
 
-case class ParentCategoryResponse(
-  id: Long,
-  name: String,
-  isIncome: Boolean,
-  isDeleted: Boolean
-)
+case class CategoryResponse(id: Long, name: String, isIncome: Boolean, isDeleted: Boolean)
 
-case class CategoryResponse(
-  id: Long,
-  parentCategoryId: Long,
-  name: String,
-  isDeleted: Boolean
-)
+case class CategoryDetailResponse(id: Long, categoryId: Long, name: String, isDeleted: Boolean)
 
-case class HowToPayResponse(
-  id: Int,
-  name: String
-)
+case class HowToPayResponse(id: Int, name: String)
 
 object MasterResponse {
-  implicit val parentCategoryFormat: Format[ParentCategoryResponse] = Json.format
-  implicit val categoryFormat: Format[CategoryResponse] = Json.format
+  implicit val categoryFormat: Format[CategoryResponse] =
+    Json.format
+  implicit val categoryDetailFormat: Format[CategoryDetailResponse] =
+    Json.format
   implicit val howToPayFormat: Format[HowToPayResponse] = Json.format
   implicit val initFormat: Format[MasterResponse] = Json.format
 
   def fromEntity(
-    parentCategories: List[ParentCategory],
     categories: List[Category],
+    categoryDetails: List[CategoryDetail],
     howToPay: List[HowToPay]
   ): MasterResponse = {
-    val parentCategoryResponse = parentCategories.map(
+    val categoryResponse = categories.map(
       c =>
-        ParentCategoryResponse(
-          id = c.parentCategoryId.value,
+        CategoryResponse(
+          id = c.categoryId.value,
           name = c.name,
           isIncome = c.isIncome,
           isDeleted = c.isDeleted
         )
     )
-    val categoryResponse = categories.map(
+    val categoryDetailResponse = categoryDetails.map(
       c =>
-        CategoryResponse(
+        CategoryDetailResponse(
           id = c.categoryId.value,
-          parentCategoryId = c.parentCategoryId.value,
+          categoryId = c.categoryId.value,
           name = c.name,
           isDeleted = c.isDeleted
         )
     )
-    val howToPayResponse = howToPay.map(
-      h =>
-        HowToPayResponse(
-          id = h.id,
-          name = h.name
-        )
-    )
+    val howToPayResponse =
+      howToPay.map(h => HowToPayResponse(id = h.id, name = h.name))
 
     MasterResponse(
-      parentCategories = parentCategoryResponse,
       categories = categoryResponse,
+      categoryDetails = categoryDetailResponse,
       howToPays = howToPayResponse
     )
   }

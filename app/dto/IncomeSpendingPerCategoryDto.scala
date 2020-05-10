@@ -1,10 +1,10 @@
 package dto
 
-import entities.{Category, Id, User}
+import entities.{CategoryDetail, Id, User}
 
 case class IncomeSpendingPerCategoryDto(
   userId: Id[User],
-  categoryId: Id[Category],
+  categoryId: Id[CategoryDetail],
   howToPayId: Int,
   amount: Int
 )

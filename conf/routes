@@ -17,6 +17,7 @@ GET            /incomeSpending/list              controllers.IncomeSpendingContr
 GET            /incomeSpending/monthly           controllers.IncomeSpendingController.listOfMonth(yyyyMM: Int, limit: Option[Int])
 GET            /budget/list                      controllers.BudgetController.list(yyyyMM: Int)
 POST           /budget/registerOrUpdate          controllers.BudgetController.registerOrUpdate()
+POST           /graphql                          controllers.Application.graphqlBody
 
 # Map static resources from the /public folder to the /assets URL path
 GET            /assets/*file                     controllers.Assets.versioned(path="/public", file: Asset)

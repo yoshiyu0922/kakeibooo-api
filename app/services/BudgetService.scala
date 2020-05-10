@@ -18,18 +18,27 @@ class BudgetService @Inject()(
   val detailRepository: BudgetDetailRepository,
   val incomeSpendingRepository: IncomeSpendingRepository,
   val masterCache: MasterCache
-)(
-  implicit ec: ExecutionContext
-) {
+)(implicit ec: ExecutionContext) {
   def list(userId: Id[User], yyyyMM: Int): Future[ListResponse] = {
     val (from, to) = fromTo(yyyyMM)
 
     for {
       budgets <- repository.findListByDateFromTo(userId, from, to)
-      results <- incomeSpendingRepository.findSpendingListGroupByCategory(userId, from, to)
-      parentCategories = masterCache.allParentCategories
-      categories = masterCache.allCategories
-    } yield ListResponse.fromEntities(budgets, results, parentCategories, categories, from)
+      results <- incomeSpendingRepository.findSpendingListGroupByCategory(
+        userId,
+        from,
+        to
+      )
+      parentCategories = masterCache.allCategories
+      categories = masterCache.allCategoryDetails
+    } yield
+      ListResponse.fromEntities(
+        budgets,
+        results,
+        parentCategories,
+        categories,
+        from
+      )
   }
 
   private def fromTo(yyyyMM: Int): (LocalDate, LocalDate) = {
@@ -40,16 +49,13 @@ class BudgetService @Inject()(
     (from, to)
   }
 
-  def registerOrUpdate(
-    userId: Id[User],
-    form: BudgetRequest
-  ): Future[CreateOrUpdateResponse] =
+  def registerOrUpdate(userId: Id[User], form: BudgetRequest): Future[CreateOrUpdateResponse] =
     DB futureLocalTx { implicit session =>
       val entity = form.convertBudgetEntity(userId)
 
       for {
         originalBudgetOpt <- repository.resolveByCategoryId(
-          entity.categoryId,
+          entity.categoryDetailId,
           entity.userId,
           entity.budgetMonth,
           form.howToPayId
@@ -96,7 +102,8 @@ class BudgetService @Inject()(
       detailRepository.register(detail)
     } else {
       val detail =
-        budget.details.head.copy(amount = form.amount, howToPayId = Option(form.howToPayId))
+        budget.details.head
+          .copy(amount = form.amount, howToPayId = Option(form.howToPayId))
       detailRepository.updateAmount(detail)
     }
 }

@@ -8,7 +8,7 @@ import play.api.data.Forms._
 import play.api.mvc._
 
 case class BudgetRequest(
-  categoryId: Id[Category],
+  categoryDetailId: Id[CategoryDetail],
   budgetMonth: LocalDate,
   amount: Int,
   howToPayId: Int,
@@ -19,7 +19,7 @@ case class BudgetRequest(
     Budget(
       budgetId = Id[Budget](),
       userId = userId,
-      categoryId = categoryId,
+      categoryDetailId = categoryDetailId,
       budgetMonth = budgetMonth,
       content = content.getOrElse(""),
       details = Nil,
@@ -47,7 +47,7 @@ object BudgetBundleRequest {
   def mappingForm[T]()(implicit request: Request[T]): Form[BudgetRequest] =
     Form(
       mapping(
-        "categoryId" -> of[Id[Category]],
+        "categoryDetailId" -> of[Id[CategoryDetail]],
         "budgetMonth" -> localDate,
         "amount" -> number,
         "howToPayId" -> number,

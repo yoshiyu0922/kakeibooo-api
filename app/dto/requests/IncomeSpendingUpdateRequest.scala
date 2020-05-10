@@ -11,8 +11,8 @@ case class IncomeSpendingUpdateRequest(
   incomeSpendingId: Id[IncomeSpending],
   accountId: Id[Account],
   accrualDate: LocalDate,
-  parentCategoryId: Id[ParentCategory],
   categoryId: Id[Category],
+  categoryDetailId: Id[CategoryDetail],
   amount: Int,
   howToPayId: Option[Int],
   isIncome: Boolean,
@@ -24,7 +24,7 @@ case class IncomeSpendingUpdateRequest(
     userId = userId,
     accountId = accountId,
     accrualDate = accrualDate,
-    categoryId = categoryId,
+    categoryDetailId = categoryDetailId,
     amount = amount,
     howToPayId = howToPayId,
     isIncome = isIncome,
@@ -38,14 +38,16 @@ case class IncomeSpendingUpdateRequest(
 
 object IncomeSpendingUpdateRequest {
 
-  def mappingForm[T]()(implicit request: Request[T]): Form[IncomeSpendingUpdateRequest] =
+  def mappingForm[T]()(
+    implicit request: Request[T]
+  ): Form[IncomeSpendingUpdateRequest] =
     Form(
       mapping(
         "incomeSpendingId" -> of[Id[IncomeSpending]],
         "accountId" -> of[Id[Account]],
         "accrualDate" -> localDate,
-        "parentCategoryId" -> of[Id[ParentCategory]],
         "categoryId" -> of[Id[Category]],
+        "categoryDetailId" -> of[Id[CategoryDetail]],
         "amount" -> number,
         "howToPayId" -> optional(number),
         "isIncome" -> boolean,

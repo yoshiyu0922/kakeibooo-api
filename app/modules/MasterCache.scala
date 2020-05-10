@@ -6,9 +6,9 @@ trait MasterCache {
 
   def initialize(): Unit
 
-  def allParentCategories: List[ParentCategory]
-
   def allCategories: List[Category]
 
-  def findCategoriesByParentCategoryId(parentCategoryId: Id[ParentCategory]): List[Category]
+  def allCategoryDetails: List[CategoryDetail]
+
+  def findDetailsByCategoryId(categoryId: Id[Category]): List[CategoryDetail]
 }

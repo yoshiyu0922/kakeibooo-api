@@ -2,10 +2,10 @@ package entities
 
 import java.time.ZonedDateTime
 
-case class ParentCategory(
-  parentCategoryId: Id[ParentCategory],
+case class CategoryDetail(
+  categoryDetailId: Id[CategoryDetail],
+  categoryId: Id[Category],
   name: String,
-  isIncome: Boolean,
   createdAt: ZonedDateTime,
   updatedAt: ZonedDateTime,
   isDeleted: Boolean,

@@ -2,7 +2,7 @@ package repositories
 
 import java.time.LocalDate
 
-import entities.{Budget, Category, Id, User}
+import entities.{Budget, CategoryDetail, Id, User}
 import javax.inject.Inject
 import repositories.ScalikeJDBCUtils._
 import scalikejdbc._
@@ -10,7 +10,7 @@ import scalikejdbc._
 import scala.concurrent.{ExecutionContext, Future}
 
 object BudgetRepository extends SQLSyntaxSupport[Budget] {
-  override val tableName = "budgets"
+  override val tableName = "budget"
   private val defaultAlias = syntax("bgt")
 
   def apply(s: SyntaxProvider[Budget])(rs: WrappedResultSet): Budget =
@@ -20,7 +20,7 @@ object BudgetRepository extends SQLSyntaxSupport[Budget] {
     Budget(
       budgetId = rs.toId[Budget](bgt.budgetId),
       userId = rs.toId[User](bgt.userId),
-      categoryId = rs.toId[Category](bgt.categoryId),
+      categoryDetailId = rs.toId[CategoryDetail](bgt.categoryDetailId),
       budgetMonth = rs.localDate(bgt.budgetMonth),
       content = rs.string(bgt.content),
       details = Nil,
@@ -37,7 +37,7 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
   private val bgtd = BudgetDetailRepository.defaultAlias
 
   def resolveByCategoryId(
-    categoryId: Id[Category],
+    categoryDetailId: Id[CategoryDetail],
     userId: Id[User],
     budgetMonth: LocalDate,
     howToPayId: Int
@@ -47,13 +47,18 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
         select
           .from(BudgetRepository as bgt)
           .leftJoin(BudgetDetailRepository as bgtd)
-          .on(sqls.eq(bgt.budgetId, bgtd.budgetId).and.eq(bgtd.howToPayId, howToPayId))
+          .on(
+            sqls
+              .eq(bgt.budgetId, bgtd.budgetId)
+              .and
+              .eq(bgtd.howToPayId, howToPayId)
+          )
           .where
           .eq(bgt.userId, userId.value)
           .and
           .eq(bgt.budgetMonth, budgetMonth)
           .and
-          .eq(bgt.categoryId, categoryId.value)
+          .eq(bgt.categoryDetailId, categoryDetailId.value)
       }.one(BudgetRepository(bgt))
         .toMany(BudgetDetailRepository.opt(bgtd))
         .map({ (budget, budgetDetails) =>
@@ -63,11 +68,9 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
         .apply()
     }
 
-  def findListByDateFromTo(
-    userId: Id[User],
-    from: LocalDate,
-    to: LocalDate
-  )(implicit s: DBSession = autoSession): Future[List[Budget]] =
+  def findListByDateFromTo(userId: Id[User], from: LocalDate, to: LocalDate)(
+    implicit s: DBSession = autoSession
+  ): Future[List[Budget]] =
     Future {
       withSQL[Budget] {
         select
@@ -80,7 +83,7 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
           .ge(bgt.budgetMonth, from)
           .and
           .le(bgt.budgetMonth, to)
-          .orderBy(bgt.categoryId)
+          .orderBy(bgt.categoryDetailId)
           .asc
       }.one(BudgetRepository(bgt))
         .toMany(BudgetDetailRepository.opt(bgtd))
@@ -91,7 +94,9 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
         .apply()
     }
 
-  def register(entity: Budget)(implicit s: DBSession = autoSession): Future[Budget] =
+  def register(
+    entity: Budget
+  )(implicit s: DBSession = autoSession): Future[Budget] =
     Future {
       val c = BudgetRepository.column
       withSQL {
@@ -100,7 +105,7 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
           .namedValues(
             c.budgetId -> entity.budgetId.value,
             c.userId -> entity.userId.value,
-            c.categoryId -> entity.categoryId.value,
+            c.categoryDetailId -> entity.categoryDetailId.value,
             c.budgetMonth -> entity.budgetMonth,
             c.content -> entity.content,
             c.createdAt -> sqls.currentTimestamp,
@@ -117,10 +122,7 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
     val c = BudgetRepository.column
     withSQL {
       update(BudgetRepository)
-        .set(
-          c.content -> entity.content,
-          c.updatedAt -> sqls.currentTimestamp
-        )
+        .set(c.content -> entity.content, c.updatedAt -> sqls.currentTimestamp)
         .where
         .eq(c.budgetId, entity.budgetId.value)
     }.update.apply()

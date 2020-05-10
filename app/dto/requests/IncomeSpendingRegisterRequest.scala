@@ -11,7 +11,7 @@ import play.api.mvc._
 case class IncomeSpendingRegisterRequest(
   accountId: Id[Account],
   accrualDate: LocalDate,
-  categoryId: Id[Category],
+  categoryDetailId: Id[CategoryDetail],
   amount: Int,
   howToPayId: Option[Int],
   isIncome: Boolean,
@@ -22,7 +22,7 @@ case class IncomeSpendingRegisterRequest(
     userId = userId,
     accountId = accountId,
     accrualDate = accrualDate,
-    categoryId = categoryId,
+    categoryDetailId = categoryDetailId,
     amount = amount,
     howToPayId = howToPayId,
     isIncome = isIncome,
@@ -36,16 +36,20 @@ case class IncomeSpendingRegisterRequest(
 
 object IncomeSpendingRegisterRequest {
 
-  def mappingForm[T]()(implicit request: Request[T]): Form[IncomeSpendingRegisterRequest] =
+  def mappingForm[T]()(
+    implicit request: Request[T]
+  ): Form[IncomeSpendingRegisterRequest] =
     Form(
       mapping(
         "accountId" -> of[Id[Account]],
         "accrualDate" -> localDate,
-        "categoryId" -> of[Id[Category]],
+        "categoryDetailId" -> of[Id[CategoryDetail]],
         "amount" -> number,
         "howToPayId" -> optional(number),
         "isIncome" -> boolean,
         "content" -> text
-      )(IncomeSpendingRegisterRequest.apply)(IncomeSpendingRegisterRequest.unapply)
+      )(IncomeSpendingRegisterRequest.apply)(
+        IncomeSpendingRegisterRequest.unapply
+      )
     ).bindFromRequest()
 }

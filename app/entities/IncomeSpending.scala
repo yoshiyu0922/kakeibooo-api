@@ -7,7 +7,7 @@ case class IncomeSpending(
   userId: Id[User],
   accountId: Id[Account],
   accrualDate: LocalDate,
-  categoryId: Id[Category],
+  categoryDetailId: Id[CategoryDetail],
   amount: Int,
   howToPayId: Option[Int],
   isIncome: Boolean,

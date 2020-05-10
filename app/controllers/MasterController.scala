@@ -20,10 +20,11 @@ class MasterController @Inject()(
 
   def all(): Action[AnyContent] = Action.async { implicit request =>
     Future {
-      val parentCategories = masterCache.allParentCategories
-      val categories = masterCache.allCategories
+      val parentCategories = masterCache.allCategories
+      val categories = masterCache.allCategoryDetails
       val howToPays = HowToPay.list
-      val response = MasterResponse.fromEntity(parentCategories, categories, howToPays)
+      val response =
+        MasterResponse.fromEntity(parentCategories, categories, howToPays)
       ok(Json.toJson(response))
     }
   }

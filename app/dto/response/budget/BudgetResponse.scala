@@ -4,7 +4,7 @@ import java.time.LocalDate
 
 import caches.HowToPay
 import dto.IncomeSpendingPerCategoryDto
-import entities.{Budget, BudgetDetail, Category, ParentCategory}
+import entities.{Budget, BudgetDetail, Category, CategoryDetail}
 import play.api.libs.json.{Format, Json}
 
 case class BudgetResponse(
@@ -22,25 +22,30 @@ object BudgetResponse {
   def fromEntity(
     budget: Option[Budget],
     results: List[IncomeSpendingPerCategoryDto],
-    parentCategories: List[ParentCategory],
-    category: Category,
+    parentCategories: List[Category],
+    categoryDetail: CategoryDetail,
     month: LocalDate
   ): BudgetResponse = {
-    val parentCategory = parentCategories.find(_.parentCategoryId == category.parentCategoryId)
+    val parentCategory =
+      parentCategories.find(_.categoryId == categoryDetail.categoryId)
     val isIncome = parentCategory.exists(_.isIncome)
 
     // 支払い方法リストに紐づく予算と実績を作成
     val details: List[BudgetDetailResponse] = HowToPay.list.map(payMethod => {
-      val detail = budget.flatMap(_.details.find(d => d.howToPayId.contains(payMethod.id)))
+      val detail =
+        budget.flatMap(_.details.find(d => d.howToPayId.contains(payMethod.id)))
       val result =
-        results.find(r => r.categoryId == category.categoryId && r.howToPayId == payMethod.id)
-      BudgetDetailResponse.fromEntity(detail, result, category, payMethod.id)
+        results.find(
+          r => r.categoryId == categoryDetail.categoryDetailId && r.howToPayId == payMethod.id
+        )
+      BudgetDetailResponse
+        .fromEntity(detail, result, categoryDetail, payMethod.id)
     })
 
     BudgetResponse(
       budgetId = budget.map(_.budgetId.value),
-      categoryId = category.categoryId.value,
-      categoryName = category.name,
+      categoryId = categoryDetail.categoryId.value,
+      categoryName = categoryDetail.name,
       budgetMonth = month,
       isIncome = isIncome,
       content = budget.map(_.content),
@@ -49,11 +54,7 @@ object BudgetResponse {
   }
 }
 
-case class BudgetDetailResponse(
-  amount: Int,
-  resultAmount: Int,
-  howToPayId: Int
-)
+case class BudgetDetailResponse(amount: Int, resultAmount: Int, howToPayId: Int)
 
 object BudgetDetailResponse {
   implicit val format: Format[BudgetDetailResponse] = Json.format
@@ -61,7 +62,7 @@ object BudgetDetailResponse {
   def fromEntity(
     detail: Option[BudgetDetail],
     result: Option[IncomeSpendingPerCategoryDto],
-    category: Category,
+    category: CategoryDetail,
     howToPayId: Int
   ): BudgetDetailResponse =
     BudgetDetailResponse(

@@ -3,7 +3,7 @@ package dto.response.budget
 import java.time.LocalDate
 
 import dto.IncomeSpendingPerCategoryDto
-import entities.{Budget, Category, ParentCategory}
+import entities.{Budget, Category, CategoryDetail}
 import play.api.libs.json.{Format, Json}
 
 case class ListResponse(list: List[BudgetResponse])
@@ -18,32 +18,34 @@ object ListResponse {
     *
     * @param budgets 予算リスト
     * @param results 実績リスト
-    * @param parentCategories 親カテゴリ
-    * @param categories カテゴリ
+    * @param categories 親カテゴリ
+    * @param categoryDetails カテゴリ
     * @param month 予算月
     * @return ListResponse
     */
   def fromEntities(
     budgets: List[Budget],
     results: List[IncomeSpendingPerCategoryDto],
-    parentCategories: List[ParentCategory],
     categories: List[Category],
+    categoryDetails: List[CategoryDetail],
     month: LocalDate
   ): ListResponse = {
     // 設定済みの予算を設定
     val responseOfBudget = budgets.map(budget => {
-      val category = categories
-        .find(_.categoryId == budget.categoryId)
+      val category = categoryDetails
+        .find(_.categoryDetailId == budget.categoryDetailId)
         .ensuring(_.isDefined, "[budget] category is not found")
         .get
-      BudgetResponse.fromEntity(Option(budget), results, parentCategories, category, month)
+      BudgetResponse
+        .fromEntity(Option(budget), results, categories, category, month)
     })
 
     // 未設定の予算に紐づくカテゴリの予算を作成
-    val responses: List[BudgetResponse] = categories
-      .filterNot(c => budgets.exists(_.categoryId == c.categoryId))
+    val responses: List[BudgetResponse] = categoryDetails
+      .filterNot(c => budgets.exists(_.categoryDetailId == c.categoryDetailId))
       .map(category => {
-        BudgetResponse.fromEntity(None, results, parentCategories, category, month)
+        BudgetResponse
+          .fromEntity(None, results, categories, category, month)
       })
     ListResponse(list = List(responseOfBudget, responses).flatten)
   }

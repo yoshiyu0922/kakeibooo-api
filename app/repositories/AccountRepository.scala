@@ -8,7 +8,7 @@ import scalikejdbc._
 import scala.concurrent.{ExecutionContext, Future}
 
 object AccountRepository extends SQLSyntaxSupport[Account] {
-  override val tableName = "accounts"
+  override val tableName = "account"
   val defaultAlias = syntax("ac")
 
   def apply(s: SyntaxProvider[Account])(rs: WrappedResultSet): Account =

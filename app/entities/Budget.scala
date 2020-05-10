@@ -5,7 +5,7 @@ import java.time.{LocalDate, ZonedDateTime}
 case class Budget(
   budgetId: Id[Budget],
   userId: Id[User],
-  categoryId: Id[Category],
+  categoryDetailId: Id[CategoryDetail],
   budgetMonth: LocalDate,
   content: String,
   details: List[BudgetDetail],
