@@ -40,7 +40,6 @@ object BudgetDetailRepository extends SQLSyntaxSupport[BudgetDetail] {
 }
 class BudgetDetailRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[BudgetDetail] {
-  private val bgtd = BudgetDetailRepository.defaultAlias
 
   def register(
     entity: BudgetDetail

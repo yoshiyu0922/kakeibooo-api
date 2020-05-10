@@ -9,6 +9,14 @@ import scalikejdbc._
 
 import scala.concurrent.{ExecutionContext, Future}
 
+case class BudgetSearchCondition(
+  userId: Id[User],
+  categoryDetailId: Option[Id[CategoryDetail]] = None,
+  budgetMonth: Option[LocalDate] = None,
+  from: Option[LocalDate] = None,
+  to: Option[LocalDate] = None
+)
+
 object BudgetRepository extends SQLSyntaxSupport[Budget] {
   override val tableName = "budget"
   private val defaultAlias = syntax("bgt")
@@ -36,9 +44,9 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
   private val bgt = BudgetRepository.defaultAlias
   private val bgtd = BudgetDetailRepository.defaultAlias
 
-  def resolveByCategoryId(
-    categoryDetailId: Id[CategoryDetail],
+  def findByCategoryId(
     userId: Id[User],
+    categoryDetailId: Id[CategoryDetail],
     budgetMonth: LocalDate,
     howToPayId: Int
   )(implicit s: DBSession = autoSession): Future[Option[Budget]] =
@@ -68,7 +76,7 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
         .apply()
     }
 
-  def findListByDateFromTo(userId: Id[User], from: LocalDate, to: LocalDate)(
+  def search(searchCondition: BudgetSearchCondition)(
     implicit s: DBSession = autoSession
   ): Future[List[Budget]] =
     Future {
@@ -77,12 +85,7 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
           .from(BudgetRepository as bgt)
           .leftJoin(BudgetDetailRepository as bgtd)
           .on(bgt.budgetId, bgtd.budgetId)
-          .where
-          .eq(bgt.userId, userId.value)
-          .and
-          .ge(bgt.budgetMonth, from)
-          .and
-          .le(bgt.budgetMonth, to)
+          .where(makeAndCondition(searchCondition))
           .orderBy(bgt.categoryDetailId)
           .asc
       }.one(BudgetRepository(bgt))
@@ -93,6 +96,17 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
         .list
         .apply()
     }
+
+  private def makeAndCondition[A](
+    searchCondition: BudgetSearchCondition
+  ): Option[SQLSyntax] =
+    sqls.toAndConditionOpt(
+      Some(sqls.eq(bgt.userId, searchCondition.userId.value)),
+      searchCondition.categoryDetailId.map(c => sqls.eq(bgt.categoryDetailId, c.value)),
+      searchCondition.budgetMonth.map(b => sqls.eq(bgt.budgetMonth, b)),
+      searchCondition.from.map(f => sqls.ge(bgt.budgetMonth, f)),
+      searchCondition.to.map(t => sqls.le(bgt.budgetMonth, t))
+    )
 
   def register(
     entity: Budget

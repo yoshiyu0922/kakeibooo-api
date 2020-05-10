@@ -9,8 +9,7 @@ import play.api.mvc._
   * application's home page.
   */
 @Singleton
-class CorsController @Inject()(cc: ControllerComponents, messagesApi: MessagesApi)
-    extends KakeiboooController(cc, messagesApi) {
+class CorsController @Inject()(cc: ControllerComponents) extends AbstractController(cc) {
 
   /**
     * Create an Action to render an HTML page.
@@ -20,6 +19,12 @@ class CorsController @Inject()(cc: ControllerComponents, messagesApi: MessagesAp
     * a path of `/`.
     */
   def index(path: String): Action[AnyContent] = Action { implicit request: Request[AnyContent] =>
-    ok("")
+    Ok("").withHeaders(
+      "Access-Control-Allow-Origin" -> "*",
+      "Accept" -> "application/json",
+      "Access-Control-Allow-Methods" -> "POST, GET, PUT, OPTIONS, PATCH, DELETE",
+      "Access-Control-Allow-Headers" -> "Origin, Authorization, Accept, Content-Type",
+      "Content-Type" -> "application/json"
+    )
   }
 }
