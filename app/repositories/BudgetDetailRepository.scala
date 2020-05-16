@@ -41,6 +41,13 @@ object BudgetDetailRepository extends SQLSyntaxSupport[BudgetDetail] {
 class BudgetDetailRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[BudgetDetail] {
 
+  /**
+    * 登録
+    *
+    * @param entity BudgetDetail
+    * @param s DBSession
+    * @return BudgetDetail
+    */
   def register(
     entity: BudgetDetail
   )(implicit s: DBSession = autoSession): Future[BudgetDetail] =
@@ -63,6 +70,13 @@ class BudgetDetailRepository @Inject()()(implicit val ec: ExecutionContext)
       entity
     }
 
+  /**
+    * 金額を更新する
+    *
+    * @param entity BudgetDetail
+    * @param s DBSession
+    * @return BudgetDetail
+    */
   def updateAmount(
     entity: BudgetDetail
   )(implicit s: DBSession = autoSession): Future[BudgetDetail] = Future {

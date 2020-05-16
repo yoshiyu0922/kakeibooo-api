@@ -3,19 +3,21 @@ package graphql.schema
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-import dto.AuthToken
-import dto.response.MutationResponse
+import dto.response.{AuthTokenResponse, MutationResponse}
 import entities._
 import graphql.Container
 import sangria.schema._
 
+/**
+  * mutationのスキーマ定義
+  */
 trait MutationType extends ArgType {
   private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
   lazy val AuthType = ObjectType(
     name = "Auth",
     description = "ログイン認証",
-    fields = fields[Container, AuthToken](
+    fields = fields[Container, AuthTokenResponse](
       Field(
         name = "token",
         fieldType = StringType,
@@ -102,7 +104,7 @@ trait MutationType extends ArgType {
           CategoryDetailIdArg ::
           AccrualDateArg ::
           AmountArg ::
-          HowToPayIdArg ::
+          HowToPayIdOptArg ::
           IsIncomeArg ::
           ContentArg ::
           Nil,
@@ -114,7 +116,7 @@ trait MutationType extends ArgType {
           val categoryDetailId = Id[CategoryDetail](ctx.arg(CategoryDetailIdArg))
           val accrualDate = LocalDate.parse(ctx.arg(AccrualDateArg), dateFormatter)
           val amount = ctx.arg(AmountArg)
-          val howToPayId = ctx.argOpt(HowToPayIdArg)
+          val howToPayId = ctx.arg(HowToPayIdOptArg)
           val isIncome = ctx.arg(IsIncomeArg)
           val content = ctx.arg(ContentArg)
 

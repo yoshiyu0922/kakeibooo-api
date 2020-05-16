@@ -2,6 +2,9 @@ package graphql.schema
 
 import sangria.schema.{Argument, BooleanType, IntType, LongType, OptionInputType, StringType}
 
+/**
+  * graphqlのリクエストパラメータの定義
+  */
 trait ArgType {
 
   val UserIdArg = Argument(name = "userId", argumentType = LongType, description = "user id")
@@ -31,6 +34,8 @@ trait ArgType {
     Argument(name = "amount", argumentType = IntType, description = "金額")
   val HowToPayIdArg =
     Argument(name = "howToPayId", argumentType = IntType, description = "支払い方法ID")
+  val HowToPayIdOptArg =
+    Argument(name = "howToPayId", argumentType = OptionInputType(IntType), description = "支払い方法ID")
   val ContentArg =
     Argument(name = "content", argumentType = OptionInputType(StringType), description = "内容")
   val AccountIdArg =

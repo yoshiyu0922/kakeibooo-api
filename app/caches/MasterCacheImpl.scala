@@ -1,5 +1,6 @@
 package caches
 
+import codemaster.HowToPay
 import entities.{Category, CategoryDetail}
 import javax.inject.Inject
 import modules.MasterCache

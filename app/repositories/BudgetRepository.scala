@@ -44,7 +44,17 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
   private val bgt = BudgetRepository.defaultAlias
   private val bgtd = BudgetDetailRepository.defaultAlias
 
-  def findByCategoryId(
+  /**
+    * カテゴリ詳細IDに紐づくBudgetとBudgetDetailを取得
+    *
+    * @param userId ユーザーID
+    * @param categoryDetailId カテゴリ詳細ID
+    * @param budgetMonth 予算月
+    * @param howToPayId 支払い方法ID
+    * @param s DBSession
+    * @return Option[Budget]
+    */
+  def resolveByCategoryDetailId(
     userId: Id[User],
     categoryDetailId: Id[CategoryDetail],
     budgetMonth: LocalDate,
@@ -76,6 +86,13 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
         .apply()
     }
 
+  /**
+    * 検索条件に紐づくBudgetとBudgetDetailを取得
+    *
+    * @param searchCondition 検索条件
+    * @param s DBSession
+    * @return List[Budget]
+    */
   def search(searchCondition: BudgetSearchCondition)(
     implicit s: DBSession = autoSession
   ): Future[List[Budget]] =
@@ -97,6 +114,13 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
         .apply()
     }
 
+  /**
+    * where条件を作成する（AND条件）
+    *
+    * @param searchCondition 検索条件
+    * @tparam A typeパラメータ
+    * @return Option[SQLSyntax]
+    */
   private def makeAndCondition[A](
     searchCondition: BudgetSearchCondition
   ): Option[SQLSyntax] =
@@ -108,6 +132,12 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
       searchCondition.to.map(t => sqls.le(bgt.budgetMonth, t))
     )
 
+  /**
+    * Budgetを登録
+    * @param entity Budget
+    * @param s DBSession
+    * @return Budget
+    */
   def register(
     entity: Budget
   )(implicit s: DBSession = autoSession): Future[Budget] =
@@ -130,6 +160,13 @@ class BudgetRepository @Inject()()(implicit val ec: ExecutionContext)
       entity
     }
 
+  /**
+    * 予算の内容を更新する
+    *
+    * @param entity Budget
+    * @param s DBSession
+    * @return Budget
+    */
   def updateContent(
     entity: Budget
   )(implicit s: DBSession = autoSession): Future[Budget] = Future {

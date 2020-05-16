@@ -35,6 +35,11 @@ class CategoryDetailRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[CategoryDetail] {
   private val c = CategoryDetailRepository.defaultAlias
 
+  /**
+    * カテゴリ詳細を全て取得する
+    * @param s DBSession
+    * @return List[CategoryDetail]
+    */
   def findAll()(
     implicit s: DBSession = autoSession
   ): Future[List[CategoryDetail]] =

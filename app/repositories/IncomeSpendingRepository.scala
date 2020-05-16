@@ -51,31 +51,47 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
   private val is = IncomeSpendingRepository.defaultAlias
   private val ac = AccountRepository.defaultAlias
 
-  def register(
-    data: IncomeSpending
-  )(implicit s: DBSession): Future[IncomeSpending] = Future {
-    val c = IncomeSpendingRepository.column
+  /**
+    * userIdとincomeSpendingIdに紐づくIncomeSpendingを取得
+    *
+    * @param userId　ユーザーID
+    * @param id 支出ID
+    * @param s DBSession
+    * @return IncomeSpending
+    */
+  def resolve(userId: Id[User], id: Id[IncomeSpending])(
+    implicit s: DBSession = autoSession
+  ): Future[IncomeSpending] = Future {
     withSQL {
-      insert
-        .into(IncomeSpendingRepository)
-        .namedValues(
-          c.incomeSpendingId -> data.incomeSpendingId.value,
-          c.userId -> data.userId.value,
-          c.accountId -> data.accountId.value,
-          c.accrualDate -> data.accrualDate,
-          c.categoryDetailId -> data.categoryDetailId.value,
-          c.amount -> data.amount,
-          c.howToPayId -> data.howToPayId,
-          c.isIncome -> data.isIncome,
-          c.content -> data.content,
-          c.createdAt -> sqls.currentTimestamp,
-          c.updatedAt -> sqls.currentTimestamp,
-          c.isDeleted -> false
-        )
-    }.update.apply()
-    data
+      select
+        .from(IncomeSpendingRepository as is)
+        .innerJoin(AccountRepository as ac)
+        .on(is.accountId, ac.accountId)
+        .where
+        .eq(is.userId, userId.value)
+        .and
+        .eq(is.isDeleted, false)
+        .and
+        .eq(is.incomeSpendingId, id.value)
+    }.map(rs => {
+        val incomeSpending = IncomeSpendingRepository(is)(rs)
+        val account = AccountRepository(ac)(rs)
+        incomeSpending.copy(accountOpt = Option(account))
+      })
+      .single()
+      .apply()
+      .ensuring(_.isDefined, s"not found IncomeSpending Data (id: $id})")
+      .get
   }
 
+  /**
+    * 検索条件に紐づくIncomeSpendingの一覧を取得
+    *
+    * @param searchCondition 検索条件
+    * @param limitOpt 上限件数（optional）
+    * @param s DBSession
+    * @return List[IncomeSpending]
+    */
   def search(
     searchCondition: IncomeSpendingSearchCondition,
     limitOpt: Option[Int]
@@ -95,38 +111,22 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
     }.map(rs => {
         val incomeSpending = IncomeSpendingRepository(is)(rs)
         val account = AccountRepository(ac)(rs)
-        incomeSpending.copy(account = Option(account))
+        incomeSpending.copy(accountOpt = Option(account))
       })
       .list
       .apply()
   }
 
-  def resolveUnique(userId: Id[User], id: Id[IncomeSpending])(
-    implicit s: DBSession = autoSession
-  ): Future[IncomeSpending] = Future {
-    withSQL {
-      select
-        .from(IncomeSpendingRepository as is)
-        .innerJoin(AccountRepository as ac)
-        .on(is.accountId, ac.accountId)
-        .where
-        .eq(is.userId, userId.value)
-        .and
-        .eq(is.isDeleted, false)
-        .and
-        .eq(is.incomeSpendingId, id.value)
-    }.map(rs => {
-        val incomeSpending = IncomeSpendingRepository(is)(rs)
-        val account = AccountRepository(ac)(rs)
-        incomeSpending.copy(account = Option(account))
-      })
-      .single()
-      .apply()
-      .ensuring(_.isDefined, s"not found IncomeSpending Data (id: $id})")
-      .get
-  }
-
-  def findSummaryPerCategoryDetail(
+  /**
+    * カテゴリ詳細IDに紐づくIncomeSpendingの一覧を取得
+    *
+    *   - 金額はカテゴリ詳細IDの合計
+    *
+    * @param searchCondition 検索条件
+    * @param s DBSession
+    * @return List[IncomeSpendingSummary]
+    */
+  def aggregatePerCategoryDetail(
     searchCondition: IncomeSpendingSearchCondition
   )(
     implicit s: DBSession = autoSession
@@ -152,6 +152,13 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
       .apply()
   }
 
+  /**
+    * where条件を作成する（AND条件）
+    *
+    * @param searchCondition 検索条件
+    * @tparam A typeパラメータ
+    * @return Option[SQLSyntax]
+    */
   private def makeAndCondition[A](
     searchCondition: IncomeSpendingSearchCondition
   ): Option[SQLSyntax] =
@@ -161,6 +168,71 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
       searchCondition.to.map(t => sqls.le(is.accrualDate, t))
     )
 
+  /**
+    * IncomeSpendingの登録をする
+    *
+    * @param entity IncomeSpending
+    * @param s DBSession
+    * @return IncomeSpending
+    */
+  def register(entity: IncomeSpending)(implicit s: DBSession): Future[IncomeSpending] = Future {
+    val c = IncomeSpendingRepository.column
+    withSQL {
+      insert
+        .into(IncomeSpendingRepository)
+        .namedValues(
+          c.incomeSpendingId -> entity.incomeSpendingId.value,
+          c.userId -> entity.userId.value,
+          c.accountId -> entity.accountId.value,
+          c.accrualDate -> entity.accrualDate,
+          c.categoryDetailId -> entity.categoryDetailId.value,
+          c.amount -> entity.amount,
+          c.howToPayId -> entity.howToPayId,
+          c.isIncome -> entity.isIncome,
+          c.content -> entity.content,
+          c.createdAt -> sqls.currentTimestamp,
+          c.updatedAt -> sqls.currentTimestamp,
+          c.isDeleted -> false
+        )
+    }.update.apply()
+    entity
+  }
+
+  /**
+    * IncomeSpendingの更新をする
+    *
+    * @param entity IncomeSpending
+    * @param s DBSession
+    * @return 更新件数
+    */
+  def updateData(entity: IncomeSpending)(implicit s: DBSession): Future[Int] =
+    Future {
+      val c = IncomeSpendingRepository.column
+      withSQL {
+        update(IncomeSpendingRepository)
+          .set(
+            c.accountId -> entity.accountId.value,
+            c.accrualDate -> entity.accrualDate,
+            c.categoryDetailId -> entity.categoryDetailId.value,
+            c.amount -> entity.amount,
+            c.howToPayId -> entity.howToPayId,
+            c.isIncome -> entity.isIncome,
+            c.content -> entity.content,
+            c.updatedAt -> sqls.currentTimestamp
+          )
+          .where
+          .eq(c.incomeSpendingId, entity.incomeSpendingId.value)
+      }.update().apply()
+    }
+
+  /**
+    * IncomeSpendingの削除をする
+    *
+    * @param userId ユーザーID
+    * @param id 支出ID
+    * @param s DBSession
+    * @return 削除件数
+    */
   def deleteData(userId: Id[User], id: Id[IncomeSpending])(
     implicit s: DBSession = autoSession
   ): Future[Int] =
@@ -173,26 +245,6 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
           .eq(c.incomeSpendingId, id.value)
           .and
           .eq(c.userId, userId.value)
-      }.update().apply()
-    }
-
-  def updateData(data: IncomeSpending)(implicit s: DBSession): Future[Int] =
-    Future {
-      val c = IncomeSpendingRepository.column
-      withSQL {
-        update(IncomeSpendingRepository)
-          .set(
-            c.accountId -> data.accountId.value,
-            c.accrualDate -> data.accrualDate,
-            c.categoryDetailId -> data.categoryDetailId.value,
-            c.amount -> data.amount,
-            c.howToPayId -> data.howToPayId,
-            c.isIncome -> data.isIncome,
-            c.content -> data.content,
-            c.updatedAt -> sqls.currentTimestamp
-          )
-          .where
-          .eq(c.incomeSpendingId, data.incomeSpendingId.value)
       }.update().apply()
     }
 }

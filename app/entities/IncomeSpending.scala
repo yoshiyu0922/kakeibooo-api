@@ -16,8 +16,14 @@ case class IncomeSpending(
   updatedAt: ZonedDateTime,
   isDeleted: Boolean,
   deletedAt: Option[ZonedDateTime],
-  account: Option[Account] = None
-)
+  accountOpt: Option[Account] = None
+) {
+
+  lazy val account = accountOpt
+    .ensuring(_.isDefined, "account is empty in IncomeSpendService.delete")
+    .get
+
+}
 
 object IncomeSpending {
   def apply(

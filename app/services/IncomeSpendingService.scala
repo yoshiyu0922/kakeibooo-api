@@ -2,7 +2,6 @@ package services
 
 import java.time.LocalDate
 
-import caches.HowToPay
 import dto.response.MutationResponse
 import entities._
 import javax.inject.{Inject, Singleton}
@@ -13,7 +12,7 @@ import repositories.{
   IncomeSpendingRepository,
   IncomeSpendingSearchCondition
 }
-import scalikejdbc.{DB, DBSession}
+import scalikejdbc.DB
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -21,10 +20,20 @@ import scala.concurrent.{ExecutionContext, Future}
 class IncomeSpendingService @Inject()(
   val repository: IncomeSpendingRepository,
   val masterCache: MasterCache,
-  val accountRepository: AccountRepository
+  val accountRepository: AccountRepository,
+  val accountService: AccountService
 )(
   implicit ec: ExecutionContext
 ) {
+
+  /**
+    * 収支を検索する
+    *
+    * @param userId ユーザーID
+    * @param yyyyMMOpt 予算月(optional)
+    * @param limitOpt 上限件数(optional)
+    * @return IncomeSpending
+    */
   def search(
     userId: Id[User],
     yyyyMMOpt: Option[Int],
@@ -43,6 +52,22 @@ class IncomeSpendingService @Inject()(
     repository.search(searchCondition = condition, limitOpt = limitOpt)
   }
 
+  /**
+    * 収支を登録もしくは更新をする
+    *
+    *   - incomeSpendingIdOptが "設定: 更新, 未設定: 登録"
+    *
+    * @param incomeSpendingIdOpt 収支ID(optional)
+    * @param userId ユーザーID
+    * @param accountId　口座ID
+    * @param accrualDate 発生日
+    * @param categoryDetailId カテゴリ詳細ID
+    * @param amount 金額
+    * @param howToPayId 支払い方法ID
+    * @param isIncome true: 収入, false: 支出
+    * @param content 内容
+    * @return MutationResponse
+    */
   def execute(
     incomeSpendingIdOpt: Option[Id[IncomeSpending]],
     userId: Id[User],
@@ -71,72 +96,67 @@ class IncomeSpendingService @Inject()(
     }
   }
 
+  /**
+    * 支出を削除する
+    *
+    *   - 削除に伴い口座残高を更新する
+    *
+    * @param userId ユーザーID
+    * @param id 支出ID
+    * @return MutationResponse
+    */
+  def delete(userId: Id[User], id: Id[IncomeSpending]): Future[MutationResponse] =
+    for {
+      incomeSpending <- repository.resolve(userId, id)
+      _ <- repository.deleteData(userId, id)
+      balance = accountService.calcBalance(
+        incomeSpending,
+        incomeSpending.account.balance,
+        isRevert = true
+      )
+      _ <- accountRepository.updateBalance(incomeSpending.accountId, balance)
+    } yield MutationResponse(id)
+
+  /**
+    * 支出を登録する
+    *
+    *   - 削除に伴い口座残高を更新する
+    *
+    * @param newEntity IncomeSpending
+    * @return MutationResponse
+    */
   private def register(newEntity: IncomeSpending): Future[MutationResponse] =
     DB futureLocalTx { implicit s =>
       for {
         data <- repository.register(newEntity)(s)
         condition = AccountSearchCondition(newEntity.userId, Option(data.accountId))
-        account <- accountRepository.findByAccountId(condition)
-        balance = calcBalance(newEntity, account)
-        _ <- accountRepository.updateBalance(data.accountId, balance)
+        account <- accountRepository.resolve(condition)
+        _ <- accountService.updateAccount(
+          newEntity.userId,
+          account.accountId,
+          newEntity.incomeSpendingId
+        )(s)
       } yield MutationResponse(data.incomeSpendingId.value)
     }
 
-  def update(entity: IncomeSpending): Future[MutationResponse] =
+  /**
+    * 支出を更新する
+    *
+    * @param entity IncomeSpending
+    * @return MutationResponse
+    */
+  private def update(entity: IncomeSpending): Future[MutationResponse] =
     DB futureLocalTx { implicit s =>
       for {
-        _ <- revertIncomeSpendingBefore(entity.userId, entity)(s)
+        _ <- accountService.revertAccount(entity.userId, entity.incomeSpendingId)(s)
         _ <- repository.updateData(entity)(s)
-        _ <- updateAccount(entity.userId, entity)(s)
+        condition = AccountSearchCondition(entity.userId, Option(entity.accountId))
+        account <- accountRepository.resolve(condition)
+        _ <- accountService.updateAccount(
+          entity.userId,
+          account.accountId,
+          entity.incomeSpendingId
+        )(s)
       } yield MutationResponse(entity.incomeSpendingId)
     }
-
-  def delete(userId: Id[User], id: Id[IncomeSpending]): Future[MutationResponse] =
-    for {
-      incomeSpending <- repository.resolveUnique(userId, id)
-      _ <- repository.deleteData(userId, id)
-      account = incomeSpending.account
-        .ensuring(_.isDefined, "account is empty in IncomeSpendService.delete")
-        .get
-      balance = calcBalance(incomeSpending, account, isRevert = true)
-      _ <- accountRepository.updateBalance(incomeSpending.accountId, balance)
-    } yield MutationResponse(id)
-
-  private def calcBalance(
-    data: IncomeSpending,
-    account: Account,
-    isRevert: Boolean = false
-  ): Int = {
-    val revertVariable = if (isRevert) -1 else 1
-    val addBalance =
-      if (data.howToPayId.contains(HowToPay.Cache.id))
-        -1 * data.amount
-      else if (data.isIncome)
-        data.amount
-      else
-        0
-
-    account.balance + (revertVariable * addBalance)
-  }
-
-  private def revertIncomeSpendingBefore(userId: Id[User], data: IncomeSpending)(
-    implicit s: DBSession
-  ) =
-    for {
-      beforeData <- repository.resolveUnique(userId, data.incomeSpendingId)
-      account = beforeData.account
-        .ensuring(_.isDefined, "account is empty in IncomeSpendService.delete")
-        .get
-      revertBalance = calcBalance(beforeData, account, isRevert = true)
-      _ <- accountRepository.updateBalance(beforeData.accountId, revertBalance)
-    } yield ()
-
-  private def updateAccount(userId: Id[User], entity: IncomeSpending)(implicit s: DBSession) = {
-    val condition = AccountSearchCondition(userId, Option(entity.accountId))
-    for {
-      account <- accountRepository.findByAccountId(condition)
-      balance = calcBalance(entity, account)
-      _ <- accountRepository.updateBalance(entity.accountId, balance)
-    } yield ()
-  }
 }

@@ -30,7 +30,15 @@ class UserRepository @Inject()() extends SQLSyntaxSupport[User] {
 
   private val u = UserRepository.defaultAlias
 
-  def find(
+  /**
+    * ユーザIDとパスワードに紐づくUserを取得
+    *
+    * @param frontUserId ユーザーID（表示用）
+    * @param password パスワード
+    * @param s DBSession
+    * @return Option[User]
+    */
+  def auth(
     frontUserId: String,
     password: String
   )(implicit s: DBSession = autoSession): Option[User] =
@@ -49,6 +57,13 @@ class UserRepository @Inject()() extends SQLSyntaxSupport[User] {
         .eq(u.frontUserId, frontUserId)
     }.map(UserRepository(u)).single.apply()
 
+  /**
+    * ユーザIDに紐づくUserを取得
+    *
+    * @param userId ユーザーID
+    * @param s DBSession
+    * @return Option[User]
+    */
   def resolveById(userId: Id[User])(implicit s: DBSession = autoSession): Option[User] =
     withSQL {
       select(
