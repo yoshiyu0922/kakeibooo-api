@@ -7,8 +7,13 @@ import scalikejdbc._
 
 import scala.concurrent.{ExecutionContext, Future}
 
+case class AccountSearchCondition(
+  userId: Id[User],
+  accountId: Option[Id[Account]] = None
+)
+
 object AccountRepository extends SQLSyntaxSupport[Account] {
-  override val tableName = "accounts"
+  override val tableName = "account"
   val defaultAlias = syntax("ac")
 
   def apply(s: SyntaxProvider[Account])(rs: WrappedResultSet): Account =
@@ -34,8 +39,8 @@ class AccountRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[Account] {
   private val ac = AccountRepository.defaultAlias
 
-  def findByUserId(
-    userId: Id[User]
+  def search(
+    searchCondition: AccountSearchCondition
   )(implicit s: DBSession = autoSession): Future[List[Account]] =
     Future {
       withSQL {
@@ -51,38 +56,25 @@ class AccountRepository @Inject()()(implicit val ec: ExecutionContext)
           ac.result.isDeleted,
           ac.result.deletedAt
         ).from(AccountRepository as ac)
-          .where
-          .eq(ac.userId, userId.value)
+          .where(makeAndCondition(searchCondition))
           .orderBy(ac.sortIndex)
       }.map(AccountRepository(ac)).list.apply()
     }
 
-  def findByAccountId(userId: Id[User], accountId: Id[Account])(
+  private def makeAndCondition[A](
+    searchCondition: AccountSearchCondition
+  ): Option[SQLSyntax] =
+    sqls.toAndConditionOpt(
+      Some(sqls.eq(ac.userId, searchCondition.userId.value)),
+      searchCondition.accountId.map(a => sqls.eq(ac.accountId, a.value))
+    )
+
+  def findByAccountId(searchCondition: AccountSearchCondition)(
     implicit s: DBSession = autoSession
   ): Future[Account] =
-    Future {
-      withSQL {
-        select(
-          ac.result.accountId,
-          ac.result.userId,
-          ac.result.assetId,
-          ac.result.name,
-          ac.result.balance,
-          ac.result.sortIndex,
-          ac.result.createdAt,
-          ac.result.updatedAt,
-          ac.result.isDeleted,
-          ac.result.deletedAt
-        ).from(AccountRepository as ac)
-          .where
-          .eq(ac.userId, userId.value)
-          .and
-          .eq(ac.accountId, accountId.value)
-      }.map(AccountRepository(ac))
-        .single()
-        .apply()
-        .ensuring(_.isDefined, s"not found accountId in $tableName")
-        .get
+    this.search(searchCondition).flatMap {
+      case list if list.size == 1 => Future.successful(list.head)
+      case _                      => Future.failed(new RuntimeException("duplicated account_id "))
     }
 
   def updateBalance(accountId: Id[Account], balance: Int)(

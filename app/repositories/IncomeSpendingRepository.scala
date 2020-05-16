@@ -2,7 +2,7 @@ package repositories
 
 import java.time.LocalDate
 
-import dto.{IncomeSpendingDto, IncomeSpendingPerCategoryDto}
+import dto.IncomeSpendingSummary
 import entities._
 import javax.inject.{Inject, Singleton}
 import repositories.ScalikeJDBCUtils._
@@ -10,20 +10,30 @@ import scalikejdbc._
 
 import scala.concurrent.{ExecutionContext, Future}
 
+case class IncomeSpendingSearchCondition(
+  userId: Id[User],
+  from: Option[LocalDate],
+  to: Option[LocalDate]
+)
+
 object IncomeSpendingRepository extends SQLSyntaxSupport[IncomeSpending] {
-  override val tableName = "income_spendings"
+  override val tableName = "income_spending"
   private val defaultAlias = syntax("icsp")
 
-  def apply(s: SyntaxProvider[IncomeSpending])(rs: WrappedResultSet): IncomeSpending =
+  def apply(
+    s: SyntaxProvider[IncomeSpending]
+  )(rs: WrappedResultSet): IncomeSpending =
     apply(s.resultName)(rs)
 
-  def apply(is: ResultName[IncomeSpending])(rs: WrappedResultSet): IncomeSpending =
+  def apply(
+    is: ResultName[IncomeSpending]
+  )(rs: WrappedResultSet): IncomeSpending =
     IncomeSpending(
       incomeSpendingId = rs.toId[IncomeSpending](is.incomeSpendingId),
       userId = rs.toId[User](is.userId),
       accountId = rs.toId[Account](is.accountId),
       accrualDate = rs.localDate(is.accrualDate),
-      categoryId = rs.toId[Category](is.categoryId),
+      categoryDetailId = rs.toId[CategoryDetail](is.categoryDetailId),
       amount = rs.int(is.amount),
       howToPayId = rs.intOpt(is.howToPayId),
       isIncome = rs.boolean(is.isIncome),
@@ -41,7 +51,9 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
   private val is = IncomeSpendingRepository.defaultAlias
   private val ac = AccountRepository.defaultAlias
 
-  def register(data: IncomeSpending)(implicit s: DBSession): Future[IncomeSpending] = Future {
+  def register(
+    data: IncomeSpending
+  )(implicit s: DBSession): Future[IncomeSpending] = Future {
     val c = IncomeSpendingRepository.column
     withSQL {
       insert
@@ -51,7 +63,7 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
           c.userId -> data.userId.value,
           c.accountId -> data.accountId.value,
           c.accrualDate -> data.accrualDate,
-          c.categoryId -> data.categoryId.value,
+          c.categoryDetailId -> data.categoryDetailId.value,
           c.amount -> data.amount,
           c.howToPayId -> data.howToPayId,
           c.isIncome -> data.isIncome,
@@ -64,45 +76,49 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
     data
   }
 
-  def resolveByUserId(
-    userId: Id[User],
+  def search(
+    searchCondition: IncomeSpendingSearchCondition,
     limitOpt: Option[Int]
-  )(implicit s: DBSession = autoSession): Future[List[IncomeSpendingDto]] = Future {
+  )(
+    implicit s: DBSession = autoSession
+  ): Future[List[IncomeSpending]] = Future {
     withSQL {
       val limit = limitOpt.getOrElse(Int.MaxValue)
       select
         .from(IncomeSpendingRepository as is)
         .innerJoin(AccountRepository as ac)
         .on(is.accountId, ac.accountId)
-        .where
+        .where(makeAndCondition(searchCondition))
+        .and
         .eq(is.isDeleted, false)
         .limit(limit)
     }.map(rs => {
         val incomeSpending = IncomeSpendingRepository(is)(rs)
         val account = AccountRepository(ac)(rs)
-        IncomeSpendingDto(incomeSpending, account)
+        incomeSpending.copy(account = Option(account))
       })
       .list
       .apply()
   }
 
-  def resolveUnique(
-    userId: Id[User],
-    id: Id[IncomeSpending]
-  )(implicit s: DBSession = autoSession): Future[IncomeSpendingDto] = Future {
+  def resolveUnique(userId: Id[User], id: Id[IncomeSpending])(
+    implicit s: DBSession = autoSession
+  ): Future[IncomeSpending] = Future {
     withSQL {
       select
         .from(IncomeSpendingRepository as is)
         .innerJoin(AccountRepository as ac)
         .on(is.accountId, ac.accountId)
         .where
+        .eq(is.userId, userId.value)
+        .and
         .eq(is.isDeleted, false)
         .and
         .eq(is.incomeSpendingId, id.value)
     }.map(rs => {
         val incomeSpending = IncomeSpendingRepository(is)(rs)
         val account = AccountRepository(ac)(rs)
-        IncomeSpendingDto(incomeSpending, account)
+        incomeSpending.copy(account = Option(account))
       })
       .single()
       .apply()
@@ -110,58 +126,24 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
       .get
   }
 
-  def findListByDateFromTo(userId: Id[User], from: LocalDate, to: LocalDate, limitOpt: Option[Int])(
+  def findSummaryPerCategoryDetail(
+    searchCondition: IncomeSpendingSearchCondition
+  )(
     implicit s: DBSession = autoSession
-  ): Future[List[IncomeSpendingDto]] = Future {
+  ): Future[List[IncomeSpendingSummary]] = Future {
     withSQL {
-      val limit = limitOpt.getOrElse(Int.MaxValue)
-      select
+      select(is.userId, is.categoryDetailId, is.howToPayId, sqls.sum(is.amount))
         .from(IncomeSpendingRepository as is)
         .innerJoin(AccountRepository as ac)
         .on(is.accountId, ac.accountId)
-        .where
-        .eq(is.userId, userId.value)
-        .and
-        .ge(is.accrualDate, from)
-        .and
-        .le(is.accrualDate, to)
-        .orderBy(is.accrualDate)
-        .desc
-        .limit(limit)
-    }.map(rs => {
-        val incomeSpending = IncomeSpendingRepository(is)(rs)
-        val account = AccountRepository(ac)(rs)
-        IncomeSpendingDto(incomeSpending, account)
-      })
-      .list
-      .apply()
-  }
-
-  def findSpendingListGroupByCategory(userId: Id[User], from: LocalDate, to: LocalDate)(
-    implicit s: DBSession = autoSession
-  ): Future[List[IncomeSpendingPerCategoryDto]] = Future {
-    withSQL {
-      select(
-        is.userId,
-        is.categoryId,
-        is.howToPayId,
-        sqls.sum(is.amount)
-      ).from(IncomeSpendingRepository as is)
-        .innerJoin(AccountRepository as ac)
-        .on(is.accountId, ac.accountId)
-        .where
-        .eq(is.userId, userId.value)
-        .and
-        .ge(is.accrualDate, from)
-        .and
-        .le(is.accrualDate, to)
+        .where(makeAndCondition(searchCondition))
         .and
         .isNotNull(is.howToPayId)
-        .groupBy(is.userId, is.categoryId, is.howToPayId)
+        .groupBy(is.userId, is.categoryDetailId, is.howToPayId)
     }.map(rs => {
-        IncomeSpendingPerCategoryDto(
+        IncomeSpendingSummary(
           rs.toId[User](is.userId),
-          rs.toId[Category](is.categoryId),
+          rs.toId[CategoryDetail](is.categoryDetailId),
           rs.int(is.howToPayId),
           rs.int(4)
         )
@@ -169,6 +151,15 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
       .list
       .apply()
   }
+
+  private def makeAndCondition[A](
+    searchCondition: IncomeSpendingSearchCondition
+  ): Option[SQLSyntax] =
+    sqls.toAndConditionOpt(
+      Some(sqls.eq(is.userId, searchCondition.userId.value)),
+      searchCondition.from.map(f => sqls.ge(is.accrualDate, f)),
+      searchCondition.to.map(t => sqls.le(is.accrualDate, t))
+    )
 
   def deleteData(userId: Id[User], id: Id[IncomeSpending])(
     implicit s: DBSession = autoSession
@@ -193,7 +184,7 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
           .set(
             c.accountId -> data.accountId.value,
             c.accrualDate -> data.accrualDate,
-            c.categoryId -> data.categoryId.value,
+            c.categoryDetailId -> data.categoryDetailId.value,
             c.amount -> data.amount,
             c.howToPayId -> data.howToPayId,
             c.isIncome -> data.isIncome,

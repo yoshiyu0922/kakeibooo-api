@@ -1,48 +1,15 @@
 package caches
 
-import com.google.inject._
-import entities._
-import javax.inject.Singleton
+import entities.{Category, CategoryDetail}
+import javax.inject.Inject
 import modules.MasterCache
-import repositories._
-import scalikejdbc.config.DBs
 
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
+class MasterCacheImpl @Inject()(masterCache: MasterCache) {
 
-@Singleton
-class MasterCacheImpl @Inject()(
-  val parentCategoryRepository: ParentCategoryRepository,
-  val categoryRepository: CategoryRepository
-) extends MasterCache {
-  private var parentCategories: List[ParentCategory] = Nil
-  private var categories: List[Category] = Nil
+  def findAllCategories: List[Category] = masterCache.allCategories
 
-  override def initialize(): Unit = {
-    DBs.setupAll()
-    import scala.concurrent.ExecutionContext.Implicits.global
+  def findAllCategoryDetails: List[CategoryDetail] =
+    masterCache.allCategoryDetails
 
-    val process = (for {
-      pc <- parentCategoryRepository.findAll()
-      c <- categoryRepository.findAll()
-    } yield {
-      parentCategories = pc
-      categories = c
-    }).recover {
-      case e: Throwable => throw e;
-    }
-    Await.ready(process, Duration.Inf)
-    DBs.closeAll()
-  }
-
-  override def allParentCategories: List[ParentCategory] = parentCategories
-
-  override def allCategories: List[Category] = categories
-
-  override def findCategoriesByParentCategoryId(
-    parentCategoryId: Id[ParentCategory]
-  ): List[Category] =
-    categories.filter(_.parentCategoryId == parentCategoryId)
-
-  initialize()
+  def howToPays = HowToPay.list
 }

@@ -4,8 +4,8 @@ import java.time.ZonedDateTime
 
 case class Category(
   categoryId: Id[Category],
-  parentCategoryId: Id[ParentCategory],
   name: String,
+  isIncome: Boolean,
   createdAt: ZonedDateTime,
   updatedAt: ZonedDateTime,
   isDeleted: Boolean,

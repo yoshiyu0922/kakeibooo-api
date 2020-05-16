@@ -8,7 +8,7 @@ import scalikejdbc._
 import scala.concurrent.{ExecutionContext, Future}
 
 object AssetRepository extends SQLSyntaxSupport[Asset] {
-  override val tableName = "assets"
+  override val tableName = "asset"
   private val defaultAlias = syntax("ast")
 
   def apply(s: SyntaxProvider[Asset])(rs: WrappedResultSet): Asset =
@@ -32,7 +32,9 @@ class AssetRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[Asset] {
   private val as = AssetRepository.defaultAlias
 
-  def findByUserId(userId: Id[User])(implicit s: DBSession = autoSession): Future[List[Asset]] =
+  def findByUserId(
+    userId: Id[User]
+  )(implicit s: DBSession = autoSession): Future[List[Asset]] =
     Future {
       withSQL {
         select(

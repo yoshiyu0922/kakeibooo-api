@@ -2,12 +2,12 @@ package services
 
 import java.time.LocalDate
 
-import dto.requests.BudgetRequest
-import dto.response.budget.{CreateOrUpdateResponse, ListResponse}
-import entities.{Budget, BudgetDetail, Id, User}
+import dto.IncomeSpendingSummary
+import dto.response.{BudgetResponse, MutationResponse}
+import entities._
 import javax.inject.{Inject, Singleton}
 import modules.MasterCache
-import repositories.{BudgetDetailRepository, BudgetRepository, IncomeSpendingRepository}
+import repositories._
 import scalikejdbc.DB
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -18,18 +18,15 @@ class BudgetService @Inject()(
   val detailRepository: BudgetDetailRepository,
   val incomeSpendingRepository: IncomeSpendingRepository,
   val masterCache: MasterCache
-)(
-  implicit ec: ExecutionContext
-) {
-  def list(userId: Id[User], yyyyMM: Int): Future[ListResponse] = {
+)(implicit ec: ExecutionContext) {
+  def search(userId: Id[User], yyyyMM: Int): Future[List[BudgetResponse]] = {
     val (from, to) = fromTo(yyyyMM)
-
+    val condition = BudgetSearchCondition(userId = userId, from = Option(from), to = Option(to))
     for {
-      budgets <- repository.findListByDateFromTo(userId, from, to)
-      results <- incomeSpendingRepository.findSpendingListGroupByCategory(userId, from, to)
-      parentCategories = masterCache.allParentCategories
-      categories = masterCache.allCategories
-    } yield ListResponse.fromEntities(budgets, results, parentCategories, categories, from)
+      budgets <- repository.search(condition)
+      conditionOfIncomeSpending = IncomeSpendingSearchCondition(userId, Option(from), Option(to))
+      results <- incomeSpendingRepository.findSummaryPerCategoryDetail(conditionOfIncomeSpending)
+    } yield makeResponse(budgets, results, from)
   }
 
   private def fromTo(yyyyMM: Int): (LocalDate, LocalDate) = {
@@ -40,23 +37,57 @@ class BudgetService @Inject()(
     (from, to)
   }
 
-  def registerOrUpdate(
+  private def makeResponse(
+    budgets: List[Budget],
+    results: List[IncomeSpendingSummary],
+    from: LocalDate
+  ): List[BudgetResponse] = {
+    val categories = masterCache.allCategories
+    val categoryDetails = masterCache.allCategoryDetails
+
+    // 設定済みの予算を設定
+    val responseOfBudget = budgets.map(budget => {
+      val categoryDetail = categoryDetails
+        .find(_.categoryDetailId == budget.categoryDetailId)
+        .ensuring(_.isDefined, "[newBudget] category is not found")
+        .get
+      val result = results.find(_.categoryDetailId == categoryDetail.categoryDetailId)
+      BudgetResponse
+        .fromEntity(Option(budget), result, categories, categoryDetail, from)
+    })
+
+    // 未設定の予算に紐づくカテゴリの予算を作成
+    val responses: List[BudgetResponse] = categoryDetails
+      .filterNot(c => budgets.exists(_.categoryDetailId == c.categoryDetailId))
+      .map(categoryDetail => {
+        val result = results.find(_.categoryDetailId == categoryDetail.categoryDetailId)
+        BudgetResponse
+          .fromEntity(None, result, categories, categoryDetail, from)
+      })
+    List(responseOfBudget, responses).flatten
+  }
+
+  def update(
     userId: Id[User],
-    form: BudgetRequest
-  ): Future[CreateOrUpdateResponse] =
+    categoryDetailId: Id[CategoryDetail],
+    budgetMonth: LocalDate,
+    amount: Int,
+    howToPayId: Int,
+    content: Option[String]
+  ): Future[MutationResponse] =
     DB futureLocalTx { implicit session =>
-      val entity = form.convertBudgetEntity(userId)
+      val entity = Budget(userId, categoryDetailId, budgetMonth, content)
 
       for {
-        originalBudgetOpt <- repository.resolveByCategoryId(
-          entity.categoryId,
+        originalBudgetOpt <- repository.findByCategoryId(
           entity.userId,
+          entity.categoryDetailId,
           entity.budgetMonth,
-          form.howToPayId
+          howToPayId
         )
         newBudget <- registerOrUpdateBudget(originalBudgetOpt, entity)
-        _ <- registerOrUpdateBudgetDetail(newBudget, form, userId)
-      } yield CreateOrUpdateResponse.fromEntity(newBudget)
+        _ <- registerOrUpdateBudgetDetail(newBudget, userId, amount, howToPayId)
+      } yield MutationResponse(newBudget.budgetId)
     }
 
   /**
@@ -81,22 +112,25 @@ class BudgetService @Inject()(
   /**
     * すでに予算の詳細が登録済みの場合は更新、そうでない場合は登録する
     *
-    * @param budget 予算
-    * @param form リクエスト
+    * @param newBudget 変更後予算
+    * @param amount 金額
+    * @param howToPayId 支払い方法ID
     * @param userId ユーザーID
     * @return Future[BudgetDetail]
     */
   private def registerOrUpdateBudgetDetail(
-    budget: Budget,
-    form: BudgetRequest,
-    userId: Id[User]
+    newBudget: Budget,
+    userId: Id[User],
+    amount: Int,
+    howToPayId: Int
   ): Future[BudgetDetail] =
-    if (budget.details.isEmpty) {
-      val detail = form.convertToBudgetDetail(budget.budgetId, userId)
+    if (newBudget.details.isEmpty) {
+      val detail = BudgetDetail(newBudget, amount, howToPayId)
       detailRepository.register(detail)
     } else {
       val detail =
-        budget.details.head.copy(amount = form.amount, howToPayId = Option(form.howToPayId))
+        newBudget.details.head
+          .copy(amount = amount, howToPayId = Option(howToPayId))
       detailRepository.updateAmount(detail)
     }
 }

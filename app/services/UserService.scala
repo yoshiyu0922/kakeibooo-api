@@ -1,6 +1,6 @@
 package services
 
-import dto.response.AuthToken
+import dto.AuthToken
 import entities.User._
 import javax.inject.{Inject, Singleton}
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
