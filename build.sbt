@@ -21,9 +21,3 @@ libraryDependencies ++= Seq(
   "org.sangria-graphql" %% "sangria-play-json" % "1.0.4",
   "org.springframework.security" % "spring-security-web" % "4.2.9.RELEASE"
 )
-
-// Adds additional packages into Twirl
-//TwirlKeys.templateImports += "com.kakeibooo.api.controllers._"
-
-// Adds additional packages into conf/routes
-// play.sbt.routes.RoutesKeys.routesImport += "com.kakeibooo.api.binders._"
