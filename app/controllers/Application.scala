@@ -1,14 +1,13 @@
 package controllers
 
+import graphql.{AuthMiddleware, ContainerImpl, SchemaDefinition}
 import javax.inject.{Inject, Singleton}
-import modules.AuthAction
 import play.api.http.Writeable
 import play.api.libs.json._
-import play.api.mvc.{AbstractController, ControllerComponents, Result}
+import play.api.mvc.{AbstractController, Action, ControllerComponents, Result}
 import sangria.execution._
 import sangria.marshalling.playJson._
 import sangria.parser.{QueryParser, SyntaxError}
-import graphql.{AuthMiddleware, ContainerImpl, SchemaDefinition}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -20,7 +19,12 @@ class Application @Inject()(
   implicit val ec: ExecutionContext
 ) extends AbstractController(cc) {
 
-  def graphqlBody = Action.async(parse.json) { request =>
+  /**
+    * graphql
+    *
+    * @return Action[JsValue]
+    */
+  def graphqlBody: Action[JsValue] = Action.async(parse.json) { request =>
     val query = (request.body \ "query").as[String]
     val operation = (request.body \ "operationName").asOpt[String]
     val variables = (request.body \ "variables").toOption.flatMap {
@@ -33,10 +37,25 @@ class Application @Inject()(
     executeQuery(query, variables, operation, tokenOpt)
   }
 
+  /**
+    * requestの`variables`をJsObjectにパースする
+    *
+    * @param variables variables in request json
+    * @return JsObject
+    */
   private def parseVariables(variables: String): JsObject =
     if (variables.trim == "" || variables.trim == "null") Json.obj()
     else Json.parse(variables).as[JsObject]
 
+  /**
+    * クエリを実行
+    *
+    * @param query query of graphql
+    * @param variables variables in request json
+    * @param operation operation in request json
+    * @param tokenOpt token in request header(bearer authentication)
+    * @return Future[Result]
+    */
   private def executeQuery(
     query: String,
     variables: Option[JsObject],

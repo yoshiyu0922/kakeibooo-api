@@ -39,6 +39,28 @@ class AccountRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[Account] {
   private val ac = AccountRepository.defaultAlias
 
+  /**
+    * 検索条件に該当するAccountを取得
+    *
+    * @param searchCondition 検索条件
+    * @param s DBSession
+    * @return Account
+    */
+  def resolve(searchCondition: AccountSearchCondition)(
+    implicit s: DBSession = autoSession
+  ): Future[Account] =
+    this.search(searchCondition).flatMap {
+      case list if list.size == 1 => Future.successful(list.head)
+      case _                      => Future.failed(new RuntimeException("duplicated account_id "))
+    }
+
+  /**
+    * 検索条件にヒットする口座一覧を取得
+    *
+    * @param searchCondition 検索条件
+    * @param s DBSession
+    * @return List[Account]
+    */
   def search(
     searchCondition: AccountSearchCondition
   )(implicit s: DBSession = autoSession): Future[List[Account]] =
@@ -61,6 +83,13 @@ class AccountRepository @Inject()()(implicit val ec: ExecutionContext)
       }.map(AccountRepository(ac)).list.apply()
     }
 
+  /**
+    * where条件を作成する（AND条件）
+    *
+    * @param searchCondition 検索条件
+    * @tparam A typeパラメータ
+    * @return Option[SQLSyntax]
+    */
   private def makeAndCondition[A](
     searchCondition: AccountSearchCondition
   ): Option[SQLSyntax] =
@@ -69,14 +98,14 @@ class AccountRepository @Inject()()(implicit val ec: ExecutionContext)
       searchCondition.accountId.map(a => sqls.eq(ac.accountId, a.value))
     )
 
-  def findByAccountId(searchCondition: AccountSearchCondition)(
-    implicit s: DBSession = autoSession
-  ): Future[Account] =
-    this.search(searchCondition).flatMap {
-      case list if list.size == 1 => Future.successful(list.head)
-      case _                      => Future.failed(new RuntimeException("duplicated account_id "))
-    }
-
+  /**
+    * 残高を更新する
+    *
+    * @param accountId 口座ID
+    * @param balance 更新後残高
+    * @param s DBSession
+    * @return 更新件数
+    */
   def updateBalance(accountId: Id[Account], balance: Int)(
     implicit s: DBSession = autoSession
   ): Future[Int] = Future {

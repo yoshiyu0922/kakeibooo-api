@@ -1,11 +1,10 @@
-package dto.response
+package dto
 
 import java.time.LocalDate
 
-import dto.IncomeSpendingSummary
 import entities.{Budget, Category, CategoryDetail}
 
-case class BudgetResponse(
+case class BudgetSummary(
   month: LocalDate,
   budget: Option[Budget],
   category: Category,
@@ -13,7 +12,7 @@ case class BudgetResponse(
   result: Option[IncomeSpendingSummary]
 )
 
-object BudgetResponse {
+object BudgetSummary {
 
   def fromEntity(
     budget: Option[Budget],
@@ -21,14 +20,14 @@ object BudgetResponse {
     categories: List[Category],
     categoryDetail: CategoryDetail,
     month: LocalDate
-  ): BudgetResponse = {
+  ): BudgetSummary = {
     val category =
       categories
         .find(_.categoryId == categoryDetail.categoryId)
         .ensuring(_.isDefined, "category is not found in BudgetResponse.fromEntry")
         .get
 
-    BudgetResponse(
+    BudgetSummary(
       month = month,
       budget = budget,
       category = category,

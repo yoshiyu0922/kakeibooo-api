@@ -7,11 +7,23 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import pdi.jwt.JwtJson
 import play.api.libs.json.JsObject
 import repositories._
-import services.{BudgetService, IncomeSpendingService, UserService}
+import services.{AccountService, BudgetService, IncomeSpendingService, UserService}
 import utils.TryUtil._
 
 import scala.concurrent.{ExecutionContext, Future}
 
+/**
+  * query/mutationで実行するクラスをインスタンス化するクラス（実装クラス）
+  *
+  * @param masterCacheModule MasterCacheModule
+  * @param userRepository UserRepository
+  * @param budgetRepository BudgetRepository
+  * @param budgetDetailRepository BudgetDetailRepository
+  * @param incomeSpendingRepository IncomeSpendingRepository
+  * @param accountRepository AccountRepository
+  * @param bCrypt BCryptPasswordEncoder
+  * @param ec ExecutionContext
+  */
 class ContainerImpl @Inject()()(
   masterCacheModule: MasterCacheModule,
   userRepository: UserRepository,
@@ -19,6 +31,7 @@ class ContainerImpl @Inject()()(
   budgetDetailRepository: BudgetDetailRepository,
   incomeSpendingRepository: IncomeSpendingRepository,
   accountRepository: AccountRepository,
+  accountService: AccountService,
   bCrypt: BCryptPasswordEncoder
 )(
   implicit val ec: ExecutionContext
@@ -42,7 +55,8 @@ class ContainerImpl @Inject()()(
   override def incomeSpendingService = new IncomeSpendingService(
     incomeSpendingRepository,
     masterCacheModule,
-    accountRepository
+    accountRepository,
+    accountService
   )
 
   override def resolveUserByToken(tokenOpt: Option[String]): Future[Option[User]] =

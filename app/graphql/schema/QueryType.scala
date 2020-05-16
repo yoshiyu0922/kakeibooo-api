@@ -2,14 +2,16 @@ package graphql.schema
 
 import java.time.format.DateTimeFormatter
 
-import caches.HowToPay
-import dto.IncomeSpendingSummary
-import dto.response.BudgetResponse
+import codemaster.HowToPay
+import dto.{BudgetSummary, IncomeSpendingSummary}
 import entities._
 import graphql.Container
 import repositories.AccountSearchCondition
 import sangria.schema._
 
+/**
+  * queryのスキーマ定義
+  */
 trait QueryType extends ArgType {
   private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
   private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -415,7 +417,7 @@ trait QueryType extends ArgType {
   val BudgetResponseType = ObjectType(
     name = "BudgetResponseType",
     description = "予算（response用）",
-    fields = fields[Container, BudgetResponse](
+    fields = fields[Container, BudgetSummary](
       Field(
         name = "month",
         fieldType = StringType,
@@ -572,7 +574,7 @@ trait QueryType extends ArgType {
         description = Some("指定したユーザの資産一覧を取得"),
         arguments = UserIdArg :: Nil,
         tags = Authorised :: Nil,
-        resolve = ctx => ctx.ctx.assetRepo.findByUserId(Id[User](ctx.arg(UserIdArg)))
+        resolve = ctx => ctx.ctx.assetRepo.resolveByUserId(Id[User](ctx.arg(UserIdArg)))
       ),
       Field(
         name = "budget",

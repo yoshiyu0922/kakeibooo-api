@@ -7,6 +7,9 @@ import services.{BudgetService, IncomeSpendingService, UserService}
 
 import scala.concurrent.Future
 
+/**
+  * query/mutationで実行するクラスを定義
+  */
 trait Container {
   def masterCache: MasterCacheImpl
 

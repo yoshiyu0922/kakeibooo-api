@@ -12,6 +12,15 @@ import sangria.schema.Context
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
+/**
+  * Middleware in graph
+  *
+  *   - クエリの実行前後で実行させたい処理を入れる
+  *
+  *   - Authorisedタグを設定しているクエリに対してはtokenOptで認証を行う
+  *
+  * @param tokenOpt token in request header
+  */
 case class AuthMiddleware(tokenOpt: Option[String])
     extends Middleware[Container]
     with MiddlewareBeforeField[Container] {

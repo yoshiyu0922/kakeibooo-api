@@ -1,10 +1,10 @@
-package caches
+package codemaster
 
 sealed abstract class HowToPay(val id: Int, val name: String)
 
 object HowToPay {
-  case object Card extends HowToPay(1, "現金払い")
-  case object Cache extends HowToPay(2, "カード払い")
+  case object Card extends HowToPay(1, "カード払い")
+  case object Cache extends HowToPay(2, "現金払い")
 
   lazy val list = List(Card, Cache)
 

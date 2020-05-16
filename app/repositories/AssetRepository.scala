@@ -32,9 +32,14 @@ class AssetRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[Asset] {
   private val as = AssetRepository.defaultAlias
 
-  def findByUserId(
-    userId: Id[User]
-  )(implicit s: DBSession = autoSession): Future[List[Asset]] =
+  /**
+    * userIdに紐づくAssetを取得
+    *
+    * @param userId ユーザーID
+    * @param s DBSession
+    * @return List[Asset]
+    */
+  def resolveByUserId(userId: Id[User])(implicit s: DBSession = autoSession): Future[List[Asset]] =
     Future {
       withSQL {
         select(
