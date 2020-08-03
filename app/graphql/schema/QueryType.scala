@@ -76,7 +76,7 @@ trait QueryType extends ArgType {
         resolve = _.value.categoryDetailId.value
       ),
       Field(
-        name = "category_id",
+        name = "categoryId",
         fieldType = LongType,
         description = Some("カテゴリID"),
         resolve = _.value.categoryId.value
@@ -548,7 +548,7 @@ trait QueryType extends ArgType {
         resolve = ctx => ctx.ctx.masterCache.findAllCategoryDetails
       ),
       Field(
-        name = "howToPay",
+        name = "howToPays",
         fieldType = ListType(HowToPayType),
         description = Some("支払い方法を全て取得"),
         tags = Authorised :: Nil,
