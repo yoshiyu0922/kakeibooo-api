@@ -16,6 +16,55 @@ trait QueryType extends ArgType {
   private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
   private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
+  lazy val UserType = ObjectType(
+    name = "User",
+    description = "ユーザー",
+    fields = fields[Container, User](
+      Field(
+        name = "id",
+        fieldType = LongType,
+        description = Some("ユーザーID"),
+        resolve = _.value.userId.value
+      ),
+      Field(
+        name = "frontUserId",
+        fieldType = StringType,
+        description = Some("表示用ユーザーID"),
+        resolve = _.value.frontUserId
+      ),
+      Field(
+        name = "name",
+        fieldType = StringType,
+        description = Some("ユーザー名"),
+        resolve = _.value.name
+      ),
+      Field(
+        name = "createdAt",
+        fieldType = StringType,
+        description = Some("作成日時"),
+        resolve = _.value.createdAt.format(dateTimeFormatter)
+      ),
+      Field(
+        name = "update",
+        fieldType = StringType,
+        description = Some("更新日時"),
+        resolve = _.value.updatedAt.format(dateTimeFormatter)
+      ),
+      Field(
+        name = "isDeleted",
+        fieldType = BooleanType,
+        description = Some("true: 削除済み, false: 削除済みでない"),
+        resolve = _.value.isDeleted
+      ),
+      Field(
+        name = "deletedAt",
+        fieldType = OptionType(StringType),
+        description = Some("削除日時"),
+        resolve = _.value.deletedAt.map(_.format(dateTimeFormatter))
+      )
+    )
+  )
+
   lazy val CategoryType = ObjectType(
     name = "Category",
     description = "カテゴリ",
@@ -533,6 +582,14 @@ trait QueryType extends ArgType {
   val Query = ObjectType(
     name = "Query",
     fields = fields[Container, Unit](
+      Field(
+        name = "user",
+        fieldType = OptionType(UserType),
+        description = Some("ログインユーザを取得"),
+        arguments = TokenArg :: Nil,
+        tags = Authorised :: Nil,
+        resolve = ctx => ctx.ctx.resolveUserByToken(Some(ctx.arg(TokenArg)))
+      ),
       Field(
         name = "categories",
         fieldType = ListType(CategoryType),
