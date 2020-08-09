@@ -23,7 +23,8 @@ object AssetRepository extends SQLSyntaxSupport[Asset] {
       createdAt = rs.zonedDateTime(as.createdAt),
       updatedAt = rs.zonedDateTime(as.updatedAt),
       isDeleted = rs.boolean(as.isDeleted),
-      deletedAt = rs.zonedDateTimeOpt(as.deletedAt)
+      deletedAt = rs.zonedDateTimeOpt(as.deletedAt),
+      accounts = Nil
     )
 }
 
@@ -31,6 +32,7 @@ object AssetRepository extends SQLSyntaxSupport[Asset] {
 class AssetRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[Asset] {
   private val as = AssetRepository.defaultAlias
+  private val ac = AccountRepository.defaultAlias
 
   /**
     * userIdに紐づくAssetを取得
@@ -41,20 +43,20 @@ class AssetRepository @Inject()()(implicit val ec: ExecutionContext)
     */
   def resolveByUserId(userId: Id[User])(implicit s: DBSession = autoSession): Future[List[Asset]] =
     Future {
-      withSQL {
-        select(
-          as.result.assetId,
-          as.result.userId,
-          as.result.name,
-          as.result.sortIndex,
-          as.result.createdAt,
-          as.result.updatedAt,
-          as.result.isDeleted,
-          as.result.deletedAt
-        ).from(AssetRepository as as)
+      withSQL[Asset] {
+        select
+          .from(AssetRepository as as)
+          .leftJoin(AccountRepository as ac)
+          .on(as.assetId, ac.assetId)
           .where
           .eq(as.userId, userId.value)
           .orderBy(as.sortIndex)
-      }.map(AssetRepository(as)).list.apply()
+      }.one(AssetRepository(as))
+        .toMany(AccountRepository.opt(ac))
+        .map({ (asset, accounts) =>
+          asset.copy(accounts = accounts.toList)
+        })
+        .list
+        .apply()
     }
 }

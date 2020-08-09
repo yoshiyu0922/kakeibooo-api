@@ -10,5 +10,6 @@ case class Asset(
   createdAt: ZonedDateTime,
   updatedAt: ZonedDateTime,
   isDeleted: Boolean,
-  deletedAt: Option[ZonedDateTime]
+  deletedAt: Option[ZonedDateTime],
+  accounts: List[Account]
 )

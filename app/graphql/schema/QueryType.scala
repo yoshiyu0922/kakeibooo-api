@@ -300,6 +300,12 @@ trait QueryType extends ArgType {
         fieldType = OptionType(StringType),
         description = Some("削除日時"),
         resolve = _.value.deletedAt.map(_.format(dateTimeFormatter))
+      ),
+      Field(
+        name = "accounts",
+        fieldType = OptionType(ListType(AccountType)),
+        description = Some("口座"),
+        resolve = _.value.accounts
       )
     )
   )

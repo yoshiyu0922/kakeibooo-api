@@ -32,6 +32,12 @@ object AccountRepository extends SQLSyntaxSupport[Account] {
       isDeleted = rs.boolean(as.isDeleted),
       deletedAt = rs.zonedDateTimeOpt(as.deletedAt)
     )
+
+  def opt(
+    s: SyntaxProvider[Account]
+  )(rs: WrappedResultSet): Option[Account] =
+    rs.toIdOpt[Account](s.resultName.accountId)
+      .map(_ => AccountRepository(s)(rs))
 }
 
 @Singleton
