@@ -3,6 +3,7 @@ package graphql.schema
 import java.time.format.DateTimeFormatter
 
 import codemaster.HowToPay
+import dto.response.IncomeSpendingListResponse
 import dto.{BudgetSummary, IncomeSpendingSummary}
 import entities._
 import graphql.Container
@@ -509,12 +510,12 @@ trait QueryType extends ArgType {
   lazy val IncomeSpendingType = ObjectType(
     name = "IncomeSpendingType",
     description = "支出",
-    fields = fields[Container, IncomeSpending](
+    fields = fields[Container, IncomeSpendingListResponse](
       Field(
         name = "id",
         fieldType = LongType,
         description = Some("支出ID"),
-        resolve = _.value.incomeSpendingId.value
+        resolve = _.value.id.value
       ),
       Field(
         name = "userId",
@@ -529,10 +530,40 @@ trait QueryType extends ArgType {
         resolve = _.value.accountId.value
       ),
       Field(
+        name = "accrualDate",
+        fieldType = StringType,
+        description = Some("発生日"),
+        resolve = _.value.accrualDate.format(dateFormatter)
+      ),
+      Field(
+        name = "categoryId",
+        fieldType = LongType,
+        description = Some("カテゴリID"),
+        resolve = _.value.categoryId.value
+      ),
+      Field(
         name = "categoryDetailId",
         fieldType = LongType,
         description = Some("カテゴリ詳細ID"),
         resolve = _.value.categoryDetailId.value
+      ),
+      Field(
+        name = "accountName",
+        fieldType = StringType,
+        description = Some("口座名"),
+        resolve = _.value.accountName
+      ),
+      Field(
+        name = "categoryName",
+        fieldType = StringType,
+        description = Some("カテゴリ名"),
+        resolve = _.value.categoryName
+      ),
+      Field(
+        name = "categoryDetailName",
+        fieldType = StringType,
+        description = Some("カテゴリ詳細名"),
+        resolve = _.value.categoryDetailName
       ),
       Field(
         name = "amount",
@@ -547,10 +578,16 @@ trait QueryType extends ArgType {
         resolve = _.value.howToPayId
       ),
       Field(
+        name = "howToPayName",
+        fieldType = StringType,
+        description = Some("支払い方法ID"),
+        resolve = _.value.howToPayName
+      ),
+      Field(
         name = "isIncome",
-        fieldType = OptionType(IntType),
+        fieldType = BooleanType,
         description = Some("true: 収入、false: 支出"),
-        resolve = _.value.howToPayId
+        resolve = _.value.isIncome
       ),
       Field(
         name = "content",
@@ -565,22 +602,10 @@ trait QueryType extends ArgType {
         resolve = _.value.createdAt.format(dateTimeFormatter)
       ),
       Field(
-        name = "update",
-        fieldType = OptionType(StringType),
-        description = Some("更新日時"),
-        resolve = _.value.updatedAt.format(dateTimeFormatter)
-      ),
-      Field(
         name = "isDeleted",
         fieldType = BooleanType,
         description = Some("true: 削除済み, false: 削除済みでない"),
         resolve = _.value.isDeleted
-      ),
-      Field(
-        name = "deletedAt",
-        fieldType = OptionType(StringType),
-        description = Some("削除日時"),
-        resolve = _.value.deletedAt.map(_.format(dateTimeFormatter))
       )
     )
   )

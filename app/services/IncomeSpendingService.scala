@@ -2,7 +2,7 @@ package services
 
 import java.time.LocalDate
 
-import dto.response.MutationResponse
+import dto.response.{IncomeSpendingListResponse, MutationResponse}
 import entities._
 import javax.inject.{Inject, Singleton}
 import modules.MasterCache
@@ -38,7 +38,7 @@ class IncomeSpendingService @Inject()(
     userId: Id[User],
     yyyyMMOpt: Option[Int],
     limitOpt: Option[Int]
-  ): Future[List[IncomeSpending]] = {
+  ): Future[List[IncomeSpendingListResponse]] = {
     val condition = yyyyMMOpt match {
       case Some(yyyyMM) =>
         val year = yyyyMM.toString.take(4).toInt
@@ -49,7 +49,9 @@ class IncomeSpendingService @Inject()(
       case None =>
         IncomeSpendingSearchCondition(userId, None, None)
     }
-    repository.search(searchCondition = condition, limitOpt = limitOpt)
+    repository
+      .search(searchCondition = condition, limitOpt = limitOpt)
+      .map(_.map(IncomeSpendingListResponse(_, masterCache)))
   }
 
   /**

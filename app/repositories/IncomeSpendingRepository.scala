@@ -239,8 +239,11 @@ class IncomeSpendingRepository @Inject()()(implicit val ec: ExecutionContext)
     Future {
       val c = IncomeSpendingRepository.column
       withSQL {
-        delete
-          .from(IncomeSpendingRepository)
+        update(IncomeSpendingRepository)
+          .set(
+            c.isDeleted -> true,
+            c.deletedAt -> sqls.currentTimestamp
+          )
           .where
           .eq(c.incomeSpendingId, id.value)
           .and
