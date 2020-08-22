@@ -13,3 +13,21 @@ case class BudgetDetail(
   isDeleted: Boolean,
   deletedAt: Option[ZonedDateTime]
 )
+
+object BudgetDetail {
+  def apply(
+    budget: Budget,
+    amount: Int,
+    howToPayId: Int
+  ): BudgetDetail = BudgetDetail(
+    budgetDetailId = Id[BudgetDetail](),
+    budgetId = budget.budgetId,
+    userId = budget.userId,
+    amount = amount,
+    howToPayId = Option(howToPayId),
+    createdAt = None,
+    updatedAt = None,
+    isDeleted = false,
+    deletedAt = None
+  )
+}

@@ -2,14 +2,17 @@ package services
 
 import java.time.LocalDate
 
-import caches.HowToPay
-import dto.requests.{IncomeSpendingRegisterRequest, IncomeSpendingUpdateRequest}
-import dto.response.incomeSpending.{DeleteResponse, ListResponse, RegisterResponse, UpdateResponse}
-import entities.{Account, Id, IncomeSpending, User}
+import dto.response.{IncomeSpendingListResponse, MutationResponse}
+import entities._
 import javax.inject.{Inject, Singleton}
 import modules.MasterCache
-import repositories.{AccountRepository, IncomeSpendingRepository}
-import scalikejdbc.{DB, DBSession}
+import repositories.{
+  AccountRepository,
+  AccountSearchCondition,
+  IncomeSpendingRepository,
+  IncomeSpendingSearchCondition
+}
+import scalikejdbc.DB
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -17,91 +20,145 @@ import scala.concurrent.{ExecutionContext, Future}
 class IncomeSpendingService @Inject()(
   val repository: IncomeSpendingRepository,
   val masterCache: MasterCache,
-  val accountRepository: AccountRepository
+  val accountRepository: AccountRepository,
+  val accountService: AccountService
 )(
   implicit ec: ExecutionContext
 ) {
 
-  def register(userId: Id[User], data: IncomeSpendingRegisterRequest): Future[RegisterResponse] =
-    DB futureLocalTx { implicit s =>
-      val entity = data.convertEntity(userId)
-      for {
-        data <- repository.register(entity)
-        account <- accountRepository.findByAccountId(userId, data.accountId)
-        balance = calcBalance(entity, account)
-        _ <- accountRepository.updateBalance(data.accountId, balance)
-      } yield RegisterResponse(data.incomeSpendingId.value)
+  /**
+    * 収支を検索する
+    *
+    * @param userId ユーザーID
+    * @param yyyyMMOpt 予算月(optional)
+    * @param limitOpt 上限件数(optional)
+    * @return IncomeSpending
+    */
+  def search(
+    userId: Id[User],
+    yyyyMMOpt: Option[Int],
+    limitOpt: Option[Int]
+  ): Future[List[IncomeSpendingListResponse]] = {
+    val condition = yyyyMMOpt match {
+      case Some(yyyyMM) =>
+        val year = yyyyMM.toString.take(4).toInt
+        val month = yyyyMM.toString.takeRight(2).toInt
+        val from = LocalDate.of(year, month, 1)
+        val to = LocalDate.of(year, month, 1).plusMonths(1).minusDays(1)
+        IncomeSpendingSearchCondition(userId, Option(from), Option(to))
+      case None =>
+        IncomeSpendingSearchCondition(userId, None, None)
     }
-
-  private def calcBalance(
-    data: IncomeSpending,
-    account: Account,
-    isRevert: Boolean = false
-  ): Int = {
-    val revertVariable = if (isRevert) -1 else 1
-    val addBalance =
-      if (data.howToPayId.contains(HowToPay.Cache.id))
-        -1 * data.amount
-      else if (data.isIncome)
-        data.amount
-      else
-        0
-
-    account.balance + (revertVariable * addBalance)
+    repository
+      .search(searchCondition = condition, limitOpt = limitOpt)
+      .map(_.map(IncomeSpendingListResponse(_, masterCache)))
   }
 
-  def list(userId: Id[User], limitOpt: Option[Int]): Future[ListResponse] =
-    repository
-      .resolveByUserId(userId, limitOpt)
-      .map(list => {
-        ListResponse.fromEntities(list, masterCache)
-      })
-
-  def listOfMonth(userId: Id[User], yyyyMM: Int, limitOpt: Option[Int]): Future[ListResponse] = {
-    val year = yyyyMM.toString.take(4).toInt
-    val month = yyyyMM.toString.takeRight(2).toInt
-    val from = LocalDate.of(year, month, 1)
-    val to = LocalDate.of(year, month, 1).plusMonths(1).minusDays(1)
-    repository
-      .findListByDateFromTo(userId, from, to, limitOpt)
-      .map(list => {
-        ListResponse.fromEntities(list, masterCache)
-      })
+  /**
+    * 収支を登録もしくは更新をする
+    *
+    *   - incomeSpendingIdOptが "設定: 更新, 未設定: 登録"
+    *
+    * @param incomeSpendingIdOpt 収支ID(optional)
+    * @param userId ユーザーID
+    * @param accountId　口座ID
+    * @param accrualDate 発生日
+    * @param categoryDetailId カテゴリ詳細ID
+    * @param amount 金額
+    * @param howToPayId 支払い方法ID
+    * @param isIncome true: 収入, false: 支出
+    * @param content 内容
+    * @return MutationResponse
+    */
+  def execute(
+    incomeSpendingIdOpt: Option[Id[IncomeSpending]],
+    userId: Id[User],
+    accountId: Id[Account],
+    accrualDate: LocalDate,
+    categoryDetailId: Id[CategoryDetail],
+    amount: Int,
+    howToPayId: Option[Int],
+    isIncome: Boolean,
+    content: Option[String]
+  ): Future[MutationResponse] = {
+    val entity = IncomeSpending(
+      incomeSpendingIdOpt,
+      userId,
+      accountId,
+      accrualDate,
+      categoryDetailId,
+      amount,
+      howToPayId,
+      isIncome,
+      content
+    )
+    incomeSpendingIdOpt match {
+      case Some(_) => update(entity)
+      case None    => register(entity)
+    }
   }
 
-  def delete(userId: Id[User], id: Id[IncomeSpending]): Future[DeleteResponse] =
+  /**
+    * 支出を削除する
+    *
+    *   - 削除に伴い口座残高を更新する
+    *
+    * @param userId ユーザーID
+    * @param id 支出ID
+    * @return MutationResponse
+    */
+  def delete(userId: Id[User], id: Id[IncomeSpending]): Future[MutationResponse] =
     for {
-      data <- repository.resolveUnique(userId, id)
-      count <- repository.deleteData(userId, id)
-      account <- accountRepository.findByAccountId(userId, data.incomeSpending.accountId)
-      balance = calcBalance(data.incomeSpending, account, true)
-      _ <- accountRepository.updateBalance(data.incomeSpending.accountId, balance)
-    } yield DeleteResponse(id.value, count)
+      incomeSpending <- repository.resolve(userId, id)
+      _ <- repository.deleteData(userId, id)
+      balance = accountService.calcBalance(
+        incomeSpending,
+        incomeSpending.account.balance,
+        isRevert = true
+      )
+      _ <- accountRepository.updateBalance(incomeSpending.accountId, balance)
+    } yield MutationResponse(id)
 
-  def update(userId: Id[User], data: IncomeSpendingUpdateRequest): Future[UpdateResponse] =
+  /**
+    * 支出を登録する
+    *
+    *   - 削除に伴い口座残高を更新する
+    *
+    * @param newEntity IncomeSpending
+    * @return MutationResponse
+    */
+  private def register(newEntity: IncomeSpending): Future[MutationResponse] =
     DB futureLocalTx { implicit s =>
-      val entity = data.convertEntity(userId)
       for {
-        _ <- revertIncomeSpendingBefore(userId, entity)
-        _ <- repository.updateData(entity)
-        _ <- updateAccount(userId, entity)
-      } yield UpdateResponse(entity.incomeSpendingId.value)
+        data <- repository.register(newEntity)(s)
+        condition = AccountSearchCondition(newEntity.userId, Option(data.accountId))
+        account <- accountRepository.resolve(condition)
+        _ <- accountService.updateAccount(
+          newEntity.userId,
+          account.accountId,
+          newEntity.incomeSpendingId
+        )(s)
+      } yield MutationResponse(data.incomeSpendingId.value)
     }
 
-  private def revertIncomeSpendingBefore(userId: Id[User], data: IncomeSpending)(
-    implicit s: DBSession
-  ) =
-    for {
-      beforeData <- repository.resolveUnique(userId, data.incomeSpendingId)
-      account <- accountRepository.findByAccountId(userId, beforeData.incomeSpending.accountId)
-      revertBalance = calcBalance(beforeData.incomeSpending, account, true)
-      _ <- accountRepository.updateBalance(beforeData.incomeSpending.accountId, revertBalance)
-    } yield ()
-
-  private def updateAccount(userId: Id[User], entity: IncomeSpending)(implicit s: DBSession) =
-    for {
-      account <- accountRepository.findByAccountId(userId, entity.accountId)
-      balance = calcBalance(entity, account)
-      _ <- accountRepository.updateBalance(entity.accountId, balance)
-    } yield ()
+  /**
+    * 支出を更新する
+    *
+    * @param entity IncomeSpending
+    * @return MutationResponse
+    */
+  private def update(entity: IncomeSpending): Future[MutationResponse] =
+    DB futureLocalTx { implicit s =>
+      for {
+        _ <- accountService.revertAccount(entity.userId, entity.incomeSpendingId)(s)
+        _ <- repository.updateData(entity)(s)
+        condition = AccountSearchCondition(entity.userId, Option(entity.accountId))
+        account <- accountRepository.resolve(condition)
+        _ <- accountService.updateAccount(
+          entity.userId,
+          account.accountId,
+          entity.incomeSpendingId
+        )(s)
+      } yield MutationResponse(entity.incomeSpendingId)
+    }
 }

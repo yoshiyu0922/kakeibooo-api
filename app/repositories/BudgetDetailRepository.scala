@@ -8,13 +8,17 @@ import scalikejdbc._
 import scala.concurrent.{ExecutionContext, Future}
 
 object BudgetDetailRepository extends SQLSyntaxSupport[BudgetDetail] {
-  override val tableName = "budget_details"
+  override val tableName = "budget_detail"
   val defaultAlias = syntax("bgtd")
 
-  def apply(s: SyntaxProvider[BudgetDetail])(rs: WrappedResultSet): BudgetDetail =
+  def apply(
+    s: SyntaxProvider[BudgetDetail]
+  )(rs: WrappedResultSet): BudgetDetail =
     apply(s.resultName)(rs)
 
-  def apply(bgtd: ResultName[BudgetDetail])(rs: WrappedResultSet): BudgetDetail =
+  def apply(
+    bgtd: ResultName[BudgetDetail]
+  )(rs: WrappedResultSet): BudgetDetail =
     BudgetDetail(
       budgetDetailId = rs.toId[BudgetDetail](bgtd.budgetDetailId),
       budgetId = rs.toId[Budget](bgtd.budgetId),
@@ -27,15 +31,26 @@ object BudgetDetailRepository extends SQLSyntaxSupport[BudgetDetail] {
       deletedAt = rs.zonedDateTimeOpt(bgtd.deletedAt)
     )
 
-  def opt(s: SyntaxProvider[BudgetDetail])(rs: WrappedResultSet): Option[BudgetDetail] =
-    rs.toIdOpt[BudgetDetail](s.resultName.budgetDetailId).map(_ => BudgetDetailRepository(s)(rs))
+  def opt(
+    s: SyntaxProvider[BudgetDetail]
+  )(rs: WrappedResultSet): Option[BudgetDetail] =
+    rs.toIdOpt[BudgetDetail](s.resultName.budgetDetailId)
+      .map(_ => BudgetDetailRepository(s)(rs))
 
 }
 class BudgetDetailRepository @Inject()()(implicit val ec: ExecutionContext)
     extends SQLSyntaxSupport[BudgetDetail] {
-  private val bgtd = BudgetDetailRepository.defaultAlias
 
-  def register(entity: BudgetDetail)(implicit s: DBSession = autoSession): Future[BudgetDetail] =
+  /**
+    * 登録
+    *
+    * @param entity BudgetDetail
+    * @param s DBSession
+    * @return BudgetDetail
+    */
+  def register(
+    entity: BudgetDetail
+  )(implicit s: DBSession = autoSession): Future[BudgetDetail] =
     Future {
       val c = BudgetDetailRepository.column
       withSQL {
@@ -55,16 +70,20 @@ class BudgetDetailRepository @Inject()()(implicit val ec: ExecutionContext)
       entity
     }
 
-  def updateAmount(entity: BudgetDetail)(
-    implicit s: DBSession = autoSession
-  ): Future[BudgetDetail] = Future {
+  /**
+    * 金額を更新する
+    *
+    * @param entity BudgetDetail
+    * @param s DBSession
+    * @return BudgetDetail
+    */
+  def updateAmount(
+    entity: BudgetDetail
+  )(implicit s: DBSession = autoSession): Future[BudgetDetail] = Future {
     val c = BudgetDetailRepository.column
     withSQL {
       update(BudgetDetailRepository)
-        .set(
-          c.amount -> entity.amount,
-          c.updatedAt -> sqls.currentTimestamp
-        )
+        .set(c.amount -> entity.amount, c.updatedAt -> sqls.currentTimestamp)
         .where
         .eq(c.budgetDetailId, entity.budgetDetailId.value)
     }.update.apply()
