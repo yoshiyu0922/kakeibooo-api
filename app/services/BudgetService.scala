@@ -104,8 +104,9 @@ class BudgetService @Inject()(
     results: List[IncomeSpendingSummary],
     from: LocalDate
   ): List[BudgetSummary] = {
-    val categories = masterCache.allCategories
-    val categoryDetails = masterCache.allCategoryDetails
+    val categories = masterCache.allCategories.filter(!_.isIncome)
+    val categoryDetails =
+      masterCache.allCategoryDetails.filter(cd => categories.exists(_.categoryId == cd.categoryId))
 
     // 設定済みの予算を設定
     val responseOfBudget = budgets.map(budget => {
