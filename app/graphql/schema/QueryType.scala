@@ -346,7 +346,7 @@ trait QueryType extends ArgType {
         resolve = _.value.content
       ),
       Field(
-        name = "budgetDetail",
+        name = "details",
         fieldType = OptionType(ListType(BudgetDetailType)),
         description = Some("予算詳細"),
         resolve = _.value.details
@@ -419,7 +419,7 @@ trait QueryType extends ArgType {
         resolve = _.value.createdAt.map(_.format(dateTimeFormatter))
       ),
       Field(
-        name = "update",
+        name = "updateAt",
         fieldType = OptionType(StringType),
         description = Some("更新日時"),
         resolve = _.value.updatedAt.map(_.format(dateTimeFormatter))
@@ -462,7 +462,7 @@ trait QueryType extends ArgType {
         resolve = _.value.howToPayId
       ),
       Field(
-        name = "amount",
+        name = "total",
         fieldType = IntType,
         description = Some("金額"),
         resolve = _.value.amount
