@@ -4,5 +4,5 @@
 # ~~~~
 
 # An example controller showing a sample home page
-OPTIONS        /*path                            controllers.CorsController.index(path)
-POST           /execute                          controllers.Application.graphqlBody
+OPTIONS /*path   adapter.controllers.CorsController.index(path)
+POST    /execute adapter.controllers.Application.graphqlBody
